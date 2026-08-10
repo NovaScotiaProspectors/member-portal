@@ -46,7 +46,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT_DIR, 'data'));
 const REFERENCE_DIR = path.join(ROOT_DIR, 'data', 'reference');
-const DATA_DRIVER = process.env.DATA_DRIVER || (supabase.isConfigured() ? 'supabase' : 'local');
+const DATA_DRIVER = supabase.dataDriver();
 const USE_SUPABASE = DATA_DRIVER === 'supabase';
 const mineralOccurrences = createMineralOccurrenceService({ geojsonPath: path.join(REFERENCE_DIR, 'mineral-occurrences.geojson') });
 

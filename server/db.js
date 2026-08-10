@@ -1,11 +1,4 @@
-/* ────────────────────────────────────────────────────────────────────────────
- * Portal database.
- *
- * Local development uses SQLite. Production can use Supabase by setting
- * DATA_DRIVER=supabase, which keeps portal data off temporary host disks.
- * ──────────────────────────────────────────────────────────────────────────── */
-
-if (process.env.DATA_DRIVER === 'supabase') {
+if (require('./supabase').dataDriver() === 'supabase') {
   module.exports = require('./portal-supabase');
   return;
 }

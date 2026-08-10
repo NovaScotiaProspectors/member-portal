@@ -21,6 +21,15 @@ services:
       - key: SESSION_SECRET
         generateValue: true
 
+      - key: DATA_DRIVER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: nspa-files
+
       - key: APP_BASE_URL
         sync: false
       - key: ADMIN_EMAILS

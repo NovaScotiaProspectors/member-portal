@@ -8,6 +8,10 @@ function isConfigured() {
   return !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
 
+function dataDriver() {
+  return process.env.DATA_DRIVER || (isConfigured() ? 'supabase' : 'local');
+}
+
 function assertConfigured() {
   if (!isConfigured()) {
     throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
@@ -126,6 +130,7 @@ async function deleteObject(objectPath) {
 
 module.exports = {
   isConfigured,
+  dataDriver,
   eq,
   select,
   insert,
