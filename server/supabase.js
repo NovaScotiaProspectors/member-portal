@@ -44,7 +44,10 @@ function eq(column, value) {
 }
 
 async function select(table, query = '') {
-  return request(restUrl(table, query), {
+  const q = query
+    ? (query.includes('select=') ? query : `select=*&${query}`)
+    : 'select=*';
+  return request(restUrl(table, q), {
     headers: headers({ Accept: 'application/json' }),
   });
 }
