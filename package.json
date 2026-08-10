@@ -1,0 +1,23 @@
+{
+  "name": "nspa-tenure-confirmation",
+  "version": "1.0.0",
+  "description": "NSPA member project form with tenure lookup and map confirmation",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "migrate:supabase": "node scripts/migrate-to-supabase.js"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "better-sqlite3": "^13.0.1",
+    "cheerio": "^1.2.0",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.3"
+  },
+  "engines": {
+    "node": ">=22 <23"
+  }
+}

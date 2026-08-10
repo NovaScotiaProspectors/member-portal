@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Claims & Alerts · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap claims-page">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header claims-hero">
+      <p class="eyebrow">Member Tools</p>
+      <h1>Claims &amp; <span>Alerts</span></h1>
+      <p class="subtitle">Track claim standing, nearby ground, and saved opportunity alerts from one place.</p>
+      <div class="claim-stat-strip" id="claimStats">
+        <div><span>Claims</span><strong>—</strong></div>
+        <div><span>Open-ground notices</span><strong>—</strong></div>
+        <div><span>Active alerts</span><strong>—</strong></div>
+        <div><span>Last checked</span><strong>—</strong></div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="stack-card">
+        <div class="form-section">
+          <div class="network-toolbar">
+            <p class="section-label" style="margin-bottom:0;">My Claims</p>
+            <span class="prices-updated" id="claimsChecked" role="status" aria-live="polite"></span>
+          </div>
+          <div id="claimsBody"><p class="form-hint">Loading your claims...</p></div>
+        </div>
+      </section>
+
+      <section class="stack-card">
+        <div class="form-section">
+          <div id="openGroundBody"></div>
+        </div>
+      </section>
+
+      <section class="stack-card">
+        <div class="form-section">
+          <div id="claimAlertsBody"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/member-portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: nspa-portal
+    runtime: node
+    plan: starter
+    region: ohio
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+
+    disk:
+      name: nspa-data
+      mountPath: /var/data
+      sizeGB: 5
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: SESSION_SECRET
+        generateValue: true
+
+      - key: APP_BASE_URL
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: METALPRICE_API_KEY
+        sync: false
+      - key: ZEFFY_STUDENT_URL
+        sync: false
+      - key: ZEFFY_REGULAR_URL
+        sync: false
+      - key: WIX_SITE_URL
+        sync: false
+      - key: WIX_MEMBER_LOGIN_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false

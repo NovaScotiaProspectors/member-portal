@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Notifications · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header">
+      <p class="eyebrow">Member Portal</p>
+      <h1>Notification <span>Centre</span></h1>
+      <p class="subtitle">Project decisions, requests for more information, and membership reminders.</p>
+    </header>
+
+    <main id="main">
+      <div class="stack-card">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">
+              Notifications <span class="unread-pill" id="unreadPill" hidden></span>
+            </p>
+            <button type="button" class="secondary-btn" id="readAllBtn" hidden>Mark All Read</button>
+          </div>
+
+          <div id="notificationsBody" aria-busy="true">
+            <p class="form-hint">Loading notifications…</p>
+          </div>
+
+          <div class="pager" id="pager" hidden>
+            <button type="button" class="secondary-btn" id="loadMoreBtn">Load More</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/member-portal.js"></script>
+</body>
+</html>

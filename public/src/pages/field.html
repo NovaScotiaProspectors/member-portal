@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111110" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Field Mode · NSPA</title>
+</head>
+<body class="field-body">
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="field-wrap">
+    <header class="field-header">
+      <div>
+        <p class="eyebrow">Field Mode</p>
+        <h1 class="field-title">Where am I?</h1>
+      </div>
+      <div class="field-header-side">
+        <span class="field-net" id="netStatus" role="status" aria-live="polite">·</span>
+        <a class="field-exit" href="/dashboard.html">Exit</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Live location status for the current claim boundary. -->
+      <section class="field-verdict" id="verdict" aria-live="polite">
+        <p class="field-verdict-label">Locating…</p>
+        <p class="field-verdict-detail">Allow location access to see which claim you're standing on.</p>
+      </section>
+
+      <div class="field-map-shell">
+        <div id="fieldMap" role="application" aria-label="Your position and claim boundaries"></div>
+        <button type="button" class="field-recentre" id="recentreBtn" aria-label="Centre on my position">◎</button>
+      </div>
+
+      <dl class="field-readout">
+        <div><dt>Latitude</dt><dd id="rLat">—</dd></div>
+        <div><dt>Longitude</dt><dd id="rLng">—</dd></div>
+        <div><dt>Accuracy</dt><dd id="rAcc">—</dd></div>
+        <div><dt>Elevation</dt><dd id="rAlt">—</dd></div>
+      </dl>
+
+      <section class="field-section">
+        <div class="field-section-head">
+          <h2>Offline maps</h2>
+          <span class="field-cache-state" id="cacheState"></span>
+        </div>
+        <p class="field-hint">
+          Save the map around your claims while you still have signal. Tiles stay on this
+          device, so the map keeps working with no connection.
+        </p>
+        <button type="button" class="submit-btn field-cache-btn" id="cacheBtn">Save My Claim Areas</button>
+        <div class="field-progress" id="cacheProgress" hidden>
+          <div class="field-progress-bar"><span id="cacheBar"></span></div>
+          <p class="field-hint" id="cacheText"></p>
+        </div>
+      </section>
+
+      <section class="field-section">
+        <h2>My claims</h2>
+        <div id="claimList"><p class="field-hint">Loading…</p></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/field.js"></script>
+</body>
+</html>

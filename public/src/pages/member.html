@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Member Profile · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <p class="breadcrumb"><a href="/network.html">← Back to the member directory</a></p>
+
+    <main id="main" aria-busy="true">
+      <div id="memberBody"><p class="form-hint">Loading profile…</p></div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/member-portal.js"></script>
+</body>
+</html>

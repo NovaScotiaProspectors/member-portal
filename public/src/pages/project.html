@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Project · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <p class="breadcrumb"><a href="/map.html">← Back to the project map</a></p>
+
+    <main id="main" aria-busy="true">
+      <div id="projectBody">
+        <p class="form-hint">Loading project…</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Lightbox for the photo gallery -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Project photo" hidden>
+    <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close photo viewer">✕</button>
+    <button type="button" class="lightbox-nav prev" id="lightboxPrev" aria-label="Previous photo">‹</button>
+    <figure class="lightbox-figure">
+      <img id="lightboxImg" alt="" />
+      <figcaption id="lightboxCaption"></figcaption>
+    </figure>
+    <button type="button" class="lightbox-nav next" id="lightboxNext" aria-label="Next photo">›</button>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/maplayers.js"></script>
+  <script src="/modules/project.js"></script>
+</body>
+</html>

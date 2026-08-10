@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Events · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header">
+      <p class="eyebrow">Member Portal</p>
+      <h1>Event <span>Calendar</span></h1>
+      <p class="subtitle">Conferences, workshops, field trips, and member meetings. Register directly from here.</p>
+    </header>
+
+    <main id="main">
+      <!-- Admin-only: create an event. Hidden for regular members. -->
+      <div class="stack-card" id="adminCard" hidden>
+        <div class="form-section">
+          <p class="section-label">Create an Event</p>
+          <form id="eventForm" novalidate enctype="multipart/form-data">
+            <div class="grid-2">
+              <div class="field">
+                <label for="ev-title">Title</label>
+                <input type="text" id="ev-title" required placeholder="Fall Prospectors Workshop" />
+              </div>
+              <div class="field">
+                <label for="ev-category">Category</label>
+                <select id="ev-category" required>
+                  <option value="workshop">Workshop</option>
+                  <option value="conference">Conference</option>
+                  <option value="field_trip">Field Trip</option>
+                  <option value="meeting">Member Meeting</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ev-start">Starts</label>
+                <input type="datetime-local" id="ev-start" required />
+              </div>
+              <div class="field">
+                <label for="ev-end">Ends <span class="label-optional">(optional)</span></label>
+                <input type="datetime-local" id="ev-end" />
+              </div>
+              <div class="field">
+                <label for="ev-location">Location</label>
+                <input type="text" id="ev-location" placeholder="Halifax, NS" />
+              </div>
+              <div class="field">
+                <label for="ev-capacity">Capacity <span class="label-optional">(blank = unlimited)</span></label>
+                <input type="number" id="ev-capacity" min="1" placeholder="40" />
+              </div>
+              <div class="field full">
+                <label for="ev-description">Description</label>
+                <textarea id="ev-description" placeholder="What members can expect…"></textarea>
+              </div>
+              <div class="field full">
+                <label for="ev-files">Pictures and files <span class="label-optional">(optional)</span></label>
+                <input type="file" id="ev-files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png" />
+                <p class="form-hint">Attach up to 6 files. PDF, Office, CSV, JPG, and PNG are accepted.</p>
+              </div>
+            </div>
+            <div class="dash-actions">
+              <button type="submit" class="submit-btn" id="createEventBtn">Create Event</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">Upcoming</p>
+            <div class="filter-chips" id="categoryFilter" role="group" aria-label="Filter events by category">
+              <button type="button" class="filter-chip active" data-category="">All</button>
+              <button type="button" class="filter-chip" data-category="conference">Conferences</button>
+              <button type="button" class="filter-chip" data-category="workshop">Workshops</button>
+              <button type="button" class="filter-chip" data-category="field_trip">Field Trips</button>
+              <button type="button" class="filter-chip" data-category="meeting">Meetings</button>
+            </div>
+          </div>
+          <div id="upcomingBody" aria-busy="true">
+            <p class="form-hint">Loading events…</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack-card" id="pastCard" hidden>
+        <div class="form-section">
+          <p class="section-label">Past Events</p>
+          <div id="pastBody"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/content.js"></script>
+</body>
+</html>

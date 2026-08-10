@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Member Dashboard · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header">
+      <p class="eyebrow">Member Dashboard</p>
+      <h1>My <span>Dashboard</span></h1>
+      <p class="subtitle">Your account, membership, and every project you've submitted.</p>
+    </header>
+
+    <main id="main">
+
+    <!-- My Profile: all profile configuration lives here, not on the Network page -->
+    <div class="stack-card">
+      <div class="form-section" id="profileSection">
+        <p class="section-label">My Profile</p>
+        <p class="form-hint" style="margin:0 0 18px;">This is what other members see in the Network directory.</p>
+
+        <div class="profile-editor">
+          <div class="profile-avatar-block">
+            <img id="avatarPreview" class="profile-avatar" alt="Your profile picture" hidden />
+            <div id="avatarFallback" class="profile-avatar profile-avatar-fallback" aria-hidden="true"></div>
+            <input type="file" id="avatarInput" accept=".jpg,.jpeg,.png" hidden />
+            <div class="profile-avatar-btns">
+              <button type="button" class="secondary-btn" id="avatarChooseBtn">Change Picture</button>
+              <button type="button" class="text-danger-btn" id="avatarRemoveBtn" hidden>Remove</button>
+            </div>
+            <p class="form-hint">JPG or PNG, up to 2 MB.</p>
+          </div>
+
+          <div class="profile-fields">
+            <div class="grid-2">
+              <div class="field">
+                <label for="pf-company">Company</label>
+                <input type="text" id="pf-company" maxlength="80" placeholder="Your company or operation" />
+              </div>
+              <div class="field">
+                <label for="pf-role">Role</label>
+                <input type="text" id="pf-role" maxlength="80" placeholder="e.g. Prospector, Geologist" />
+              </div>
+              <div class="field">
+                <label for="pf-location">Location</label>
+                <input type="text" id="pf-location" maxlength="80" placeholder="e.g. Halifax, NS" />
+              </div>
+              <div class="field">
+                <label for="pf-phone">Contact phone</label>
+                <input type="tel" id="pf-phone" maxlength="30" placeholder="(902) 555-0100" />
+              </div>
+              <div class="field full">
+                <label for="pf-bio">Bio</label>
+                <textarea id="pf-bio" maxlength="600" placeholder="A short introduction — your background, interests, and what you're working on."></textarea>
+              </div>
+              <div class="field">
+                <label for="pf-website">Website</label>
+                <input type="url" id="pf-website" maxlength="200" placeholder="https://…" />
+              </div>
+              <div class="field">
+                <label for="pf-linkedin">LinkedIn</label>
+                <input type="url" id="pf-linkedin" maxlength="200" placeholder="https://linkedin.com/in/…" />
+              </div>
+              <div class="field">
+                <label for="pf-facebook">Facebook</label>
+                <input type="url" id="pf-facebook" maxlength="200" placeholder="https://facebook.com/…" />
+              </div>
+              <div class="field">
+                <label for="pf-x">X / Twitter</label>
+                <input type="url" id="pf-x" maxlength="200" placeholder="https://x.com/…" />
+              </div>
+              <div class="field full">
+                <label for="pf-expertise">Areas of expertise</label>
+                <input type="text" id="pf-expertise" placeholder="Comma-separated, e.g. Gold, Soil sampling, Drone surveys" />
+                <p class="form-hint">Up to 10, separated by commas.</p>
+              </div>
+            </div>
+
+            <fieldset class="network-visibility profile-visibility">
+              <legend>What other members can see</legend>
+              <label><input type="checkbox" id="vis-email" /> <span>Email address</span></label>
+              <label><input type="checkbox" id="vis-phone" /> <span>Phone number</span></label>
+              <label><input type="checkbox" id="vis-projects" /> <span>Submitted projects</span></label>
+              <label><input type="checkbox" id="vis-tenures" /> <span>Tenure numbers</span></label>
+              <label><input type="checkbox" id="vis-commodities" /> <span>Commodities and deposit types</span></label>
+            </fieldset>
+
+            <div class="dash-actions">
+              <button type="button" class="submit-btn" id="saveProfileBtn">Save Profile</button>
+              <span class="prices-updated" id="profileStatus" role="status" aria-live="polite"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack-card">
+      <div class="form-section" id="accountBody">
+        <p class="section-label">Account</p>
+        <p class="form-hint">Loading…</p>
+      </div>
+    </div>
+
+    <div class="stack-card">
+      <div class="form-section">
+        <div class="prices-toolbar">
+          <div>
+            <p class="section-label" style="margin-bottom: 0;">Claims &amp; Alerts</p>
+            <p class="form-hint" style="margin:6px 0 0;">Track tenure standing and saved opportunity alerts.</p>
+          </div>
+          <a class="secondary-btn" href="/claims.html">Open Claims &amp; Alerts</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project Workspace -->
+    <div class="stack-card">
+      <div class="form-section">
+        <div class="prices-toolbar">
+          <p class="section-label" style="margin-bottom: 0;">Project Workspace</p>
+          <a class="secondary-btn" href="/index.html">+ New Project</a>
+        </div>
+        <div id="projectsBody">
+          <p class="form-hint">Loading your projects…</p>
+        </div>
+      </div>
+    </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/member-portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+node_modules/
+.env
+
+data/users.xlsx
+data/projects.xlsx
+data/submissions.json
+data/*.db
+data/*.db-*
+data/uploads/
+data/resources/
+data/event-files/
+*.tmp
+data/backups/

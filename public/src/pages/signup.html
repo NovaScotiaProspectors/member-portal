@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Sign Up · NSPA</title>
+</head>
+<body class="auth-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap auth-wrap">
+    <header class="page-header auth-header">
+      <p class="eyebrow">Nova Scotia Prospectors Association</p>
+      <h1>Member <span>Access</span></h1>
+      <p class="subtitle">Create your account or securely return to your member workspace.</p>
+    </header>
+
+    <div class="form-card auth-card">
+      <section class="form-section auth-panel auth-panel-primary" aria-labelledby="create-account-title">
+        <div class="auth-panel-heading">
+          <span class="auth-panel-index">01</span>
+          <div>
+            <p class="auth-panel-kicker">New member</p>
+            <h2 id="create-account-title">Create your account</h2>
+            <p>Join the NSPA member registry and start submitting projects.</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="su-first">First Name</label>
+            <input type="text" id="su-first" name="firstName" placeholder="Jane" autocomplete="given-name" />
+          </div>
+
+          <div class="field">
+            <label for="su-last">Last Name</label>
+            <input type="text" id="su-last" name="lastName" placeholder="Smith" autocomplete="family-name" />
+          </div>
+
+          <div class="field full">
+            <label for="su-email">Email Address</label>
+            <input type="email" id="su-email" name="email" placeholder="jane@example.com" autocomplete="email" />
+          </div>
+
+          <div class="field full">
+            <label for="su-phone">Phone Number</label>
+            <input type="tel" id="su-phone" name="phone" placeholder="(902) 555-0100" autocomplete="tel" />
+          </div>
+
+          <div class="field">
+            <label for="su-password">Password</label>
+            <input type="password" id="su-password" name="password" placeholder="••••••••" autocomplete="new-password" />
+            <p class="form-hint">At least 8 characters.</p>
+          </div>
+
+          <div class="field">
+            <label for="su-confirm">Confirm Password</label>
+            <input type="password" id="su-confirm" name="confirm" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+        </div>
+
+        <button class="submit-btn auth-submit" id="signup-btn" type="button">
+          Create Account
+          <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 7.5h9M8 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </section>
+
+      <section class="form-section auth-panel auth-panel-returning" aria-labelledby="sign-in-title">
+        <div class="auth-panel-heading">
+          <span class="auth-panel-index">02</span>
+          <div>
+            <p class="auth-panel-kicker">Returning member</p>
+            <h2 id="sign-in-title">Welcome back</h2>
+            <p>Sign in to open your projects and membership workspace.</p>
+          </div>
+        </div>
+
+        <div class="auth-login-fields">
+          <div class="field">
+            <label for="si-email">Email Address</label>
+            <input type="email" id="si-email" name="signinEmail" placeholder="jane@example.com" autocomplete="email" />
+          </div>
+
+          <div class="field">
+            <label for="si-password">Password</label>
+            <input type="password" id="si-password" name="signinPassword" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+        </div>
+
+        <div class="auth-actions">
+          <button class="secondary-btn" id="signin-btn" type="button">Sign In</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="auth-trust-note">
+      <span class="auth-trust-icon" aria-hidden="true">
+        <svg viewBox="0 0 18 18" fill="none"><path d="M9 1.75 15 4v4.3c0 3.7-2.4 6.4-6 7.95-3.6-1.55-6-4.25-6-7.95V4l6-2.25Z" stroke="currentColor" stroke-width="1.25"/><path d="m6.4 8.9 1.7 1.7 3.5-3.7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <p>Your details are stored in the NSPA member registry. Passwords are never stored in plain text.</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/public-pages.js"></script>
+</body>
+</html>

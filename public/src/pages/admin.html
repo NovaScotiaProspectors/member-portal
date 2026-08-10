@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Admin Dashboard · NSPA</title>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap page-wide">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header">
+      <p class="eyebrow">Staff Admin</p>
+      <h1>Admin <span>Dashboard</span></h1>
+      <p class="subtitle">Manage members, projects, public content, exports, and system checks.</p>
+    </header>
+
+    <main id="main">
+      <div class="admin-section-nav" aria-label="Admin sections">
+        <a href="#membersPanel">Members</a>
+        <a href="#projectsPanel">Projects</a>
+        <a href="#systemPanel">System</a>
+        <a href="#backupPanel">Backups</a>
+      </div>
+
+      <div class="admin-stats" id="adminStats"></div>
+
+      <div class="admin-quick-grid">
+        <a class="admin-quick-card" href="/events.html">
+          <span class="admin-quick-icon" aria-hidden="true">E</span>
+          <span class="admin-stat-label">Content</span>
+          <strong>Events</strong>
+          <span>Create events, delete events, manage the archive.</span>
+        </a>
+        <a class="admin-quick-card" href="/resources.html">
+          <span class="admin-quick-icon" aria-hidden="true">R</span>
+          <span class="admin-stat-label">Library</span>
+          <strong>Resources</strong>
+          <span>Add files, links, guides, and templates.</span>
+        </a>
+        <a class="admin-quick-card" href="/map.html">
+          <span class="admin-quick-icon" aria-hidden="true">M</span>
+          <span class="admin-stat-label">Projects</span>
+          <strong>Map</strong>
+          <span>Review approved project visibility.</span>
+        </a>
+        <a class="admin-quick-card" href="/api/admin/export/members.csv">
+          <span class="admin-quick-icon" aria-hidden="true">CSV</span>
+          <span class="admin-stat-label">Export</span>
+          <strong>Members CSV</strong>
+          <span>Download the member list.</span>
+        </a>
+        <a class="admin-quick-card" href="/api/admin/export/projects.csv">
+          <span class="admin-quick-icon" aria-hidden="true">CSV</span>
+          <span class="admin-stat-label">Export</span>
+          <strong>Projects CSV</strong>
+          <span>Download project records.</span>
+        </a>
+      </div>
+
+      <div class="stack-card admin-panel" id="systemPanel">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">System Checks</p>
+            <button type="button" class="secondary-btn" id="refreshOverviewBtn">Refresh</button>
+          </div>
+          <div class="admin-actions-row">
+            <button type="button" class="secondary-btn" id="claimWatchBtn">Run Claim Watch</button>
+            <button type="button" class="secondary-btn" id="mailTestBtn">Send Test Email</button>
+            <span class="prices-updated" id="systemStatus" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card admin-panel" id="membersPanel">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">Members</p>
+            <button type="button" class="secondary-btn" id="refreshMembersBtn">Refresh</button>
+          </div>
+          <div class="admin-filter-bar">
+            <div class="field">
+              <label for="memberSearch">Search Members</label>
+              <input type="search" id="memberSearch" placeholder="Name, email, phone, member ID" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="memberStatusFilter">Membership</label>
+              <select id="memberStatusFilter">
+                <option value="">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Lapsed</option>
+                <option value="none">Registered</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="memberNetworkFilter">Network</label>
+              <select id="memberNetworkFilter">
+                <option value="">All</option>
+                <option value="joined">Joined</option>
+                <option value="out">Out</option>
+              </select>
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Member</th><th>Contact</th><th>Membership</th><th>Network</th><th>Account</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="membersBody">
+                <tr><td colspan="6" class="admin-empty">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack-card admin-panel" id="projectsPanel">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">Projects</p>
+            <button type="button" class="secondary-btn" id="refreshProjectsBtn">Refresh</button>
+          </div>
+          <form class="admin-create-project" id="adminCreateProjectForm">
+            <div class="admin-create-project-head">
+              <div>
+                <h2>Create and assign project</h2>
+                <p class="form-hint">Tenure boundaries are pulled from NovaROC automatically.</p>
+              </div>
+              <button type="submit" class="submit-btn">Create Project</button>
+            </div>
+            <div class="admin-create-grid">
+              <div class="field">
+                <label for="adminProjectMember">Member</label>
+                <select id="adminProjectMember" required>
+                  <option value="">Choose member</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="adminProjectStatus">Status</label>
+                <select id="adminProjectStatus"></select>
+              </div>
+              <div class="field">
+                <label for="adminProjectName">Project Name</label>
+                <input type="text" id="adminProjectName" maxlength="120" required />
+              </div>
+              <div class="field">
+                <label for="adminProjectOperator">Operator</label>
+                <input type="text" id="adminProjectOperator" maxlength="120" />
+              </div>
+              <div class="field full">
+                <label for="adminProjectTenures">Tenure Numbers</label>
+                <textarea id="adminProjectTenures" rows="2" placeholder="Separate with commas or spaces" required></textarea>
+              </div>
+              <div class="field">
+                <label for="adminProjectCommodities">Commodities</label>
+                <input type="text" id="adminProjectCommodities" placeholder="Gold, lithium" />
+              </div>
+              <div class="field">
+                <label for="adminProjectDepositTypes">Deposit Types</label>
+                <input type="text" id="adminProjectDepositTypes" placeholder="Vein, pegmatite" />
+              </div>
+              <div class="field full">
+                <label for="adminProjectDescription">Description</label>
+                <textarea id="adminProjectDescription" rows="3"></textarea>
+              </div>
+            </div>
+          </form>
+          <div class="admin-filter-bar">
+            <div class="field">
+              <label for="projectSearch">Search Projects</label>
+              <input type="search" id="projectSearch" placeholder="Project, operator, member, tenure" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="projectStatusFilter">Status</label>
+              <select id="projectStatusFilter">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="projectVisibilityFilter">Visibility</label>
+              <select id="projectVisibilityFilter">
+                <option value="">All</option>
+                <option value="visible">Visible</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr><th>Project</th><th>Member</th><th>Submitted</th><th>Status</th><th>Visibility</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="projectsBody">
+                <tr><td colspan="6" class="admin-empty">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backups -->
+      <div class="stack-card admin-panel" id="backupPanel">
+        <div class="form-section">
+          <div class="prices-toolbar">
+            <p class="section-label" style="margin-bottom: 0;">Backups</p>
+            <span class="prices-updated" id="backupStatus" role="status" aria-live="polite"></span>
+          </div>
+
+          <div class="dash-actions" style="margin-bottom: 16px;">
+            <button type="button" class="submit-btn" id="backupNowBtn">Back Up Now</button>
+            <button type="button" class="secondary-btn" id="backupFullBtn">Include Documents</button>
+          </div>
+
+          <div id="backupList"><p class="form-hint">Loading…</p></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/admin.js"></script>
+</body>
+</html>

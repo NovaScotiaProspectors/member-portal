@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Project Map · NSPA</title>
+</head>
+<body class="map-body">
+  <a class="skip-link" href="#mapMain">Skip to the map</a>
+
+  <!-- Compact top bar, so the map gets the rest of the viewport -->
+  <div class="map-topbar">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+  </div>
+
+  <main class="map-stage" id="mapMain">
+    <!-- Sidebar: search, filters, layers, results -->
+    <aside class="map-sidebar" id="mapSidebar" aria-label="Map controls and project list">
+      <div class="map-sidebar-inner">
+        <header class="map-sidebar-head">
+          <h1 class="map-sidebar-title">Project Map</h1>
+          <p class="map-sidebar-count" id="mapCount" role="status" aria-live="polite">Loading…</p>
+        </header>
+
+        <div class="map-search">
+          <svg class="map-search-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input type="search" id="mapSearch" autocomplete="off"
+                 aria-label="Search projects, companies and tenure numbers"
+                 placeholder="Search projects, companies, tenures…" />
+        </div>
+
+        <details class="map-filter-block" id="filterBlock" open>
+          <summary>
+            <span>Filters</span>
+            <span class="map-filter-count" id="activeFilterCount" hidden>0</span>
+          </summary>
+
+          <div class="map-filter-grid">
+            <div class="field"><label for="fCommodity">Commodity</label>
+              <select id="fCommodity"><option value="">All</option></select></div>
+            <div class="field"><label for="fCounty">County</label>
+              <select id="fCounty"><option value="">All</option></select></div>
+            <div class="field"><label for="fStatus">Status</label>
+              <select id="fStatus"><option value="">All</option></select></div>
+            <div class="field"><label for="fDeposit">Deposit type</label>
+              <select id="fDeposit"><option value="">All</option></select></div>
+            <div class="field"><label for="fOperator">Company</label>
+              <select id="fOperator"><option value="">All</option></select></div>
+            <div class="field"><label for="fOwner">Member</label>
+              <select id="fOwner"><option value="">All</option></select></div>
+            <div class="field"><label for="fStage">Stage</label>
+              <select id="fStage"><option value="">All</option></select></div>
+            <div class="field"><label for="fTenure">Tenure number</label>
+              <select id="fTenure"><option value="">All</option></select></div>
+            <div class="field"><label for="fMedia">Project details</label>
+              <select id="fMedia">
+                <option value="">All</option>
+                <option value="photos">Has photos</option>
+                <option value="documents">Has files</option>
+                <option value="resource">Has resource estimate</option>
+              </select></div>
+            <div class="field"><label for="fYear">Year</label>
+              <select id="fYear"><option value="">All</option></select></div>
+            <div class="field"><label for="fSort">Sort</label>
+              <select id="fSort">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="title">Project name</option>
+                <option value="company">Company</option>
+                <option value="county">County</option>
+              </select></div>
+          </div>
+
+          <div class="map-filter-actions-row">
+            <button type="button" class="map-reset-btn" id="resetFiltersBtn">Reset filters</button>
+            <button type="button" class="map-reset-btn" id="fitResultsBtn">Fit results</button>
+          </div>
+        </details>
+
+        <details class="map-filter-block" id="layerBlock">
+          <summary><span>Map layers</span></summary>
+          <div class="map-layer-body">
+            <fieldset class="layer-group">
+              <legend>Base map</legend>
+              <div id="baseLayerList"></div>
+            </fieldset>
+            <div id="overlayGroups"></div>
+          </div>
+        </details>
+
+        <div class="map-results" id="mapProjectList" aria-label="Matching projects">
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-card"></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="map-canvas">
+      <div id="projectMap" role="application" aria-label="Map of member projects"></div>
+
+      <button type="button" class="map-sidebar-toggle" id="sidebarToggle"
+              aria-expanded="true" aria-controls="mapSidebar">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
+          <path id="toggleIcon" d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor"
+                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="sr-only" id="toggleLabel">Collapse sidebar</span>
+      </button>
+
+      <div class="map-legend-float">
+        <p class="map-legend-title">Status</p>
+        <ul>
+          <li><span class="swatch" style="background:var(--success)"></span>Approved</li>
+          <li><span class="swatch" style="background:var(--gold)"></span>Pending</li>
+          <li><span class="swatch" style="background:var(--info)"></span>Submitted</li>
+          <li><span class="swatch" style="background:var(--warning)"></span>Revisions</li>
+          <li><span class="swatch" style="background:var(--danger)"></span>Rejected</li>
+        </ul>
+        <p class="map-legend-note" id="zoomHint">Zoom in for claim boundaries</p>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/maplayers.js"></script>
+  <script src="/modules/map.js"></script>
+</body>
+</html>

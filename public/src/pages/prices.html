@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Metal Prices · NSPA</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header">
+      <p class="eyebrow">Live Commodity Markets</p>
+      <h1>Metal &amp; <span>Mineral</span> Prices</h1>
+      <p class="subtitle">Search live precious metal prices available on the current market-data plan.</p>
+    </header>
+
+    <main id="main">
+
+    <div class="form-card">
+      <div class="form-section">
+        <div class="prices-toolbar">
+          <p class="section-label" style="margin-bottom: 0;">Market Prices</p>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <span class="prices-updated" id="pricesUpdated">Loading…</span>
+            <button type="button" class="secondary-btn" id="refreshBtn">Refresh</button>
+          </div>
+        </div>
+
+        <div class="prices-filter-bar">
+          <div class="field">
+            <label for="priceSearch">Search</label>
+            <input type="search" id="priceSearch" placeholder="Search metal or symbol" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="categoryFilter">Category</label>
+            <select id="categoryFilter">
+              <option value="">All categories</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="availabilityFilter">Availability</label>
+            <select id="availabilityFilter">
+              <option value="">All prices</option>
+              <option value="available">Available only</option>
+              <option value="unavailable">Unavailable only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="prices-summary" id="pricesSummary"></div>
+        <div class="prices-grid" id="pricesGrid"></div>
+
+        <p class="prices-disclaimer">
+          Prices are sourced from MetalpriceAPI and may be delayed based on the active API plan.
+          Shown for reference only — not investment advice.
+        </p>
+      </div>
+    </div>
+    </main>
+  </div>
+
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/public-pages.js"></script>
+</body>
+</html>

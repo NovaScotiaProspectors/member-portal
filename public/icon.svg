@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="42" fill="#111110"/>
+  <!-- claim block -->
+  <path d="M46 62h58l42 26v42H46z" fill="none" stroke="#C9A84C" stroke-width="7" stroke-linejoin="round"/>
+  <!-- position pin -->
+  <circle cx="96" cy="104" r="13" fill="#C9A84C"/>
+  <circle cx="96" cy="104" r="26" fill="none" stroke="#C9A84C" stroke-width="4" opacity="0.55"/>
+</svg>

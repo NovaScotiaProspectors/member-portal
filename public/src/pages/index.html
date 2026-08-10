@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>NSPA Members' Projects Form</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-wrap">
+    <nav class="site-nav" aria-label="Site navigation"></nav>
+
+    <header class="page-header project-header">
+      <div class="header-copy">
+        <p class="eyebrow">Nova Scotia Prospectors Association</p>
+        <h1>Members' <span>Projects</span> Form</h1>
+        <p class="subtitle">Submit your project information for the NSPA member registry</p>
+      </div>
+    </header>
+
+    <main id="main">
+
+    <div class="form-card">
+      <div class="form-section">
+        <p class="section-label">Contact Information</p>
+        <div class="member-id-pill" id="memberIdPill"></div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="prospector_first_name">First Name</label>
+            <input type="text" id="prospector_first_name" name="prospector_first_name" placeholder="Jane" />
+          </div>
+
+          <div class="field">
+            <label for="prospector_last_name">Last Name</label>
+            <input type="text" id="prospector_last_name" name="prospector_last_name" placeholder="Smith" />
+          </div>
+
+          <div class="field">
+            <label for="contact-email">Email Address</label>
+            <input type="email" id="contact-email" name="contact-email" placeholder="jane@example.com" />
+          </div>
+
+          <div class="field">
+            <label for="phone">Phone Number</label>
+            <input id="phone" type="tel" name="phone" placeholder="(902) 555-0100" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="section-label">Project Details</p>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="project">Project Name</label>
+            <input type="text" id="project" name="project" placeholder="Goldbrook North" />
+          </div>
+
+          <div class="field">
+            <label for="operator">Operator</label>
+            <input type="text" id="operator" name="operator" placeholder="Company / Operator name" />
+          </div>
+
+          <div class="field full">
+            <label for="project-description">Project Description</label>
+            <textarea id="project-description" name="project-description"
+                      placeholder="A short summary of the project — geology, history, and what you're targeting."></textarea>
+          </div>
+        </div>
+
+        <div class="tenure-section">
+          <div class="tenure-section-header">
+            <p class="field-label">Tenure Numbers</p>
+            <button type="button" class="secondary-btn tenure-add-btn" id="add-tenure-btn">
+              <svg viewBox="0 0 14 14" width="12" height="12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Tenure
+            </button>
+          </div>
+
+          <div id="tenure-entries-container" class="tenure-entries-container"></div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <p class="field-label" style="margin-bottom: 9px;">Target Commodity Type</p>
+
+          <div class="commodity-btn" id="commodityBtn">
+            <span class="commodity-btn-text">Select all that apply</span>
+            <span class="commodity-btn-icon">
+              <svg viewBox="0 0 12 8" width="12" height="8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </span>
+          </div>
+
+          <ul class="commodity-list" id="commodityList">
+            <li class="commodity-search-row">
+              <input type="text" id="commoditySearch" class="dropdown-search" placeholder="Search commodities…" aria-label="Search commodities" autocomplete="off" />
+            </li>
+            <li class="commodity-empty" id="commodityEmpty">Loading commodities…</li>
+          </ul>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <div class="field full">
+            <label id="depositTypeLabel">Deposit Type</label>
+            <input type="hidden" id="deposit-type-select" name="deposit-type" value="" />
+
+            <div class="deposit-dropdown" id="depositDropdown">
+              <button type="button" class="deposit-trigger" id="depositTrigger">
+                <span class="deposit-trigger-text">Select deposit type</span>
+                <span class="deposit-trigger-icon">
+                  <svg viewBox="0 0 12 8" width="12" height="8" fill="none">
+                    <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </button>
+
+              <div class="deposit-panel" id="depositPanel">
+                <input type="text" id="depositSearch" class="dropdown-search" placeholder="Search deposit types…" aria-label="Search deposit types" autocomplete="off" />
+                <p class="deposit-empty" id="depositEmpty">Loading deposit types…</p>
+              </div>
+            </div>
+
+            <div id="depositUndeterminedContainer"></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <div class="field full">
+            <label id="projectStageLabel">Project Stage</label>
+            <div class="stage-cards" id="stageCards">
+              <input type="hidden" id="project-stage-select" name="project-stage" value="" />
+
+              <div class="stage-card" data-value="grassroots">
+                <div class="stage-card-top"><span class="stage-dot"></span><span class="stage-name">Grassroots</span></div>
+                <p class="stage-hint">No drilling</p>
+              </div>
+
+              <div class="stage-card" data-value="exploration">
+                <div class="stage-card-top"><span class="stage-dot"></span><span class="stage-name">Exploration</span></div>
+                <p class="stage-hint">Drilling involved</p>
+              </div>
+
+              <div class="stage-card" data-value="advanced">
+                <div class="stage-card-top"><span class="stage-dot"></span><span class="stage-name">Advanced</span></div>
+                <p class="stage-hint">Discovery made</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="section-label">Resources &amp; References</p>
+
+        <div class="grid-2">
+          <div class="field full">
+            <label for="resource-estimate-id">Resource Estimate</label>
+            <textarea id="resource-estimate-id" name="resource-estimate"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="resource-estimate-source">Resource Estimate Source</label>
+            <input type="text" id="resource-estimate-source" name="resource-estimate-source" placeholder="Author / Report / Date" />
+          </div>
+
+          <div class="field">
+            <label for="website-link">Website</label>
+            <input type="text" id="website-link" name="website-link" placeholder="https://yourproject.com" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="section-label">Additional Documents</p>
+
+        <div class="doc-section">
+          <div class="doc-section-header">
+            <p class="field-label">Supporting Documents</p>
+            <button type="button" class="secondary-btn tenure-add-btn" id="add-document-btn">
+              <svg viewBox="0 0 14 14" width="12" height="12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Another Document
+            </button>
+          </div>
+
+          <p class="doc-section-hint">Optional — attach reports, assays, maps or photos. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG. Up to 100 MB per file, 10 files max.</p>
+
+          <div id="document-entries-container" class="tenure-entries-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <p class="footer-note">All submissions are reviewed by the NSPA team. You will be contacted at the email address provided.</p>
+
+      <button class="submit-btn" id="submit-btn" type="button">
+        Submit Project
+        <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7.5h9M8 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+  <script src="/modules/nav.js"></script>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/script.js"></script>
+</body>
+</html>
