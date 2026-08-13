@@ -2057,33 +2057,21 @@ async function visibleProjectRecords(user, { includeGeometry = false } = {}) {
 
 
 /* ── Optional outbound email ────────────────────────────────────────────────
- * Configured through SMTP_* in .env. When it isn't configured, every caller
- * silently falls back to the in-app notification, which is the channel members
- * actually rely on — so a missing mail server is never a broken feature.
+ * Configured through RESEND_API_KEY, or SMTP_* as a fallback (see mail.js for
+ * why Resend is preferred). When neither is set, every caller silently falls
+ * back to the in-app notification, which is the channel members actually rely
+ * on — so a missing mail server is never a broken feature.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-const SMTP_HOST = process.env.SMTP_HOST || '';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
 const MAIL_FROM = process.env.MAIL_FROM || 'NSPA <no-reply@prospectors.ns.ca>';
 
-let mailer = null;
-let mailStatus = { configured: false, verified: false, error: 'SMTP_HOST is not set' };
+const mailSetup = require('./mail').createMailer();
+let mailer = mailSetup.mailer;
+let mailStatus = mailSetup.status;
+const MAIL_TRANSPORT = mailSetup.describe;
 
-if (SMTP_HOST) {
-  try {
-    mailer = require('nodemailer').createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465, // 587 uses STARTTLS, which nodemailer negotiates
-      auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-    });
-    mailStatus = { configured: true, verified: false, error: null };
-  } catch (error) {
-    mailStatus = { configured: false, verified: false, error: error.message };
-    console.warn('mail: transport unavailable —', error.message);
-  }
+if (!mailer && mailStatus.error && mailStatus.error !== 'Neither RESEND_API_KEY nor SMTP_HOST is set') {
+  console.warn('mail: transport unavailable —', mailStatus.error);
 }
 
 /**
@@ -2110,7 +2098,7 @@ function sendMailIfConfigured({ to, subject, text, attachments }) {
 
 /** Same, but reports whether delivery actually succeeded. */
 async function sendMailAwaited({ to, subject, text, attachments }) {
-  if (!mailer) return { sent: false, reason: 'SMTP is not configured' };
+  if (!mailer) return { sent: false, reason: 'Email is not configured' };
   if (!to) return { sent: false, reason: 'No recipient address' };
   try {
     await mailer.sendMail({ from: MAIL_FROM, to, subject, text, attachments });
@@ -3256,14 +3244,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Say plainly whether email will work, and exactly what to fix if not.
   if (!mailer) {
     console.log('  ⓘ Email off — claim alerts are in-app only.');
-    console.log('    To enable: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM in .env (see .env.example).');
+    console.log('    To enable: set RESEND_API_KEY and MAIL_FROM in .env, or SMTP_* for a direct mail server (see .env.example).');
   } else {
     verifyMailer().then(status => {
       if (status.verified) {
-        console.log(`  ✓ Email ready via ${SMTP_HOST}:${SMTP_PORT} as ${SMTP_USER || '(no auth)'}`);
+        console.log(`  ✓ Email ready via ${MAIL_TRANSPORT}`);
       } else {
-        console.log(`  ⚠ SMTP configured but the server rejected it: ${status.error}`);
-        console.log('    Alerts will still arrive in-app. Check SMTP_USER / SMTP_PASS.');
+        console.log(`  ⚠ Email configured (${MAIL_TRANSPORT}) but it was rejected: ${status.error}`);
+        console.log('    Alerts will still arrive in-app. Check the API key or SMTP credentials.');
       }
     });
   }

@@ -35,12 +35,12 @@ function registerAdminRoutes(app, ctx) {
     const status = await verifyMailer();
     if (!status.configured) {
       return res.status(503).json({
-        error: 'SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS in .env, then restart.',
+        error: 'Email is not configured. Set RESEND_API_KEY (or SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) in the environment, then restart.',
         ...status,
       });
     }
     if (!status.verified) {
-      return res.status(502).json({ error: `SMTP rejected the connection: ${status.error}`, ...status });
+      return res.status(502).json({ error: `The mail provider rejected the connection: ${status.error}`, ...status });
     }
 
     const to = String(req.body.to || req.user.email || '').trim();
