@@ -4,7 +4,6 @@ const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const cookieParser = require('cookie-parser');
-const multer = require('multer');
 const { registerPageRoutes } = require('./routes/pages');
 const { registerTenureRoutes } = require('./routes/tenure');
 const { normalizeTenure, fetchTenureGeoJSON } = require('./services/novaRoc');
@@ -24,6 +23,7 @@ const { registerProfileRoutes } = require('./routes/profile');
 const { registerMembershipRoutes } = require('./routes/membership');
 const { registerAdminRoutes } = require('./routes/admin');
 const { clampInt } = require('./utils/numbers');
+const { parseDataRoomUrl, planProjectEdit } = require('./projectEdits');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -209,6 +209,7 @@ const PROJECT_HEADERS = [
   'Reviewed By',
   'Reviewed At',
   'Archived',
+  'Data Room URL',
 ];
 const PROJECT_ID_COL = 1;
 const PROJECT_STATUS_COL = 17;
@@ -217,6 +218,8 @@ const PROJECT_REVIEW_NOTE_COL = 19;
 const PROJECT_REVIEWED_BY_COL = 20;
 const PROJECT_REVIEWED_AT_COL = 21;
 const PROJECT_ARCHIVED_COL = 22;
+// Appended after 'Archived' so existing sheets keep every column where it was.
+const PROJECT_DATA_ROOM_COL = 23;
 
 async function getProjectsSheet() {
   const wb = new ExcelJS.Workbook();
@@ -277,6 +280,7 @@ function ensureProjectsSheetSchema(ws) {
     { key: 'reviewedBy', width: 24 },
     { key: 'reviewedAt', width: 24 },
     { key: 'archived', width: 12 },
+    { key: 'dataRoomUrl', width: 60 },
   ];
 }
 
@@ -323,6 +327,11 @@ async function appendProjectToSheet(submission) {
     submission.website || '',
     submission.status || 'Pending',
     documentsCellText(submission.documents),
+    '', // review note
+    '', // reviewed by
+    '', // reviewed at
+    '', // archived
+    submission.dataRoomUrl || '',
   ]);
 
   await fs.mkdir(path.dirname(PROJECTS_XLSX), { recursive: true });
@@ -354,6 +363,7 @@ function supabaseProjectToRow(project) {
     reviewedBy: project.reviewed_by || '',
     reviewedAt: project.reviewed_at || '',
     archived: !!project.archived,
+    dataRoomUrl: project.data_room_url || '',
   };
 }
 
@@ -378,6 +388,7 @@ function submissionToProjectRow(submission, id = submission.id) {
     status: submission.status || 'Pending',
     documents_text: documentsCellText(submission.documents),
     archived: false,
+    data_room_url: submission.dataRoomUrl || '',
   };
 }
 
@@ -398,7 +409,12 @@ async function appendProjectToSupabase(submission) {
   return projectId;
 }
 
-/* ── Additional documents: upload storage + validation ──────────────────── */
+/* ── File upload storage + validation ────────────────────────────────────
+ * Projects no longer accept uploads — they carry a Data Room link instead —
+ * but resources and event files still do, and share these limits and helpers
+ * (see routes/content.js). Documents attached to projects before the change
+ * remain on disk and are still served by the download/view routes below.
+ * ──────────────────────────────────────────────────────────────────────── */
 
 const SUBMISSIONS_PATH = path.join(DATA_DIR, 'submissions.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
@@ -406,6 +422,39 @@ const DOCUMENT_ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '
 const DOCUMENT_MAX_MB = Number(process.env.DOCUMENT_MAX_MB || 25);
 const DOCUMENT_MAX_SIZE = DOCUMENT_MAX_MB * 1024 * 1024;
 const DOCUMENT_MAX_COUNT = 10;
+
+function discardUploadedFiles(files) {
+  for (const file of files || []) {
+    if (file && file.path) fs.unlink(file.path).catch(() => {});
+  }
+}
+
+function describeUploadError(err) {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return `Each file must be ${DOCUMENT_MAX_SIZE / (1024 * 1024)} MB or smaller.`;
+  }
+  if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return `You can upload at most ${DOCUMENT_MAX_COUNT} files at a time.`;
+  }
+  return 'Could not process the uploaded files.';
+}
+
+function documentValidationError(file) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (!DOCUMENT_ALLOWED_EXTENSIONS.includes(ext)) {
+    return `"${file.originalname}" is not an accepted file type. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.`;
+  }
+  if (file.size === 0) {
+    return `"${file.originalname}" is empty.`;
+  }
+  return null;
+}
+
+function safeDocumentFileName(name) {
+  const base = path.basename(String(name || 'document'));
+  const cleaned = base.replace(/[^\w.\- ]+/g, '_').slice(-120);
+  return cleaned || 'document';
+}
 
 let submissionsWriteChain = Promise.resolve();
 
@@ -460,133 +509,13 @@ async function writeSubmissions(submissions) {
   }
 }
 
-// Files land in a temp dir on disk (not memory) and are moved into local
-// storage or uploaded to Supabase once the project ID is issued.
-// Multer removes its own temp files when a request errors mid-upload.
-const UPLOAD_TMP_DIR = path.join(UPLOADS_DIR, '.tmp');
-
-const documentUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      require('fs').mkdirSync(UPLOAD_TMP_DIR, { recursive: true });
-      cb(null, UPLOAD_TMP_DIR);
-    },
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`),
-  }),
-  limits: { fileSize: DOCUMENT_MAX_SIZE, files: DOCUMENT_MAX_COUNT },
-});
-
-function discardUploadedFiles(files) {
-  for (const file of files || []) {
-    if (file && file.path) fs.unlink(file.path).catch(() => {});
-  }
-}
-
-function describeUploadError(err) {
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return `Each document must be ${DOCUMENT_MAX_SIZE / (1024 * 1024)} MB or smaller.`;
-  }
-  if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return `You can upload at most ${DOCUMENT_MAX_COUNT} documents per project.`;
-  }
-  return 'Could not process the uploaded documents.';
-}
-
-function documentValidationError(file) {
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  if (!DOCUMENT_ALLOWED_EXTENSIONS.includes(ext)) {
-    return `"${file.originalname}" is not an accepted file type. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.`;
-  }
-  if (file.size === 0) {
-    return `"${file.originalname}" is empty.`;
-  }
-  return null;
-}
-
-function safeDocumentFileName(name) {
-  const base = path.basename(String(name || 'document'));
-  const cleaned = base.replace(/[^\w.\- ]+/g, '_').slice(-120);
-  return cleaned || 'document';
-}
-
-// Accepts either a plain JSON submission (no documents) or multipart/form-data
-// with a `payload` JSON field, `documents` files, and a `documentTitles` JSON
-// array aligned with the files.
+// Projects are submitted as plain JSON. Supporting documents are no longer
+// uploaded here — a project points at a Google Drive folder instead (see
+// `dataRoomUrl`). Documents attached before that change are still stored and
+// still served by the download/view routes below; nothing was removed.
 function parseProjectSubmission(req, res, next) {
-  if (!req.is('multipart/form-data')) {
-    req.projectPayload = req.body || {};
-    req.documentFiles = [];
-    req.documentTitles = [];
-    return next();
-  }
-
-  documentUpload.array('documents', DOCUMENT_MAX_COUNT)(req, res, err => {
-    if (err) return res.status(400).json({ error: describeUploadError(err) });
-
-    try {
-      req.projectPayload = req.body.payload ? JSON.parse(req.body.payload) : {};
-    } catch {
-      discardUploadedFiles(req.files);
-      return res.status(400).json({ error: 'Invalid project payload.' });
-    }
-
-    try {
-      const titles = req.body.documentTitles ? JSON.parse(req.body.documentTitles) : [];
-      req.documentTitles = Array.isArray(titles) ? titles.map(t => String(t || '').trim().slice(0, 200)) : [];
-    } catch {
-      req.documentTitles = [];
-    }
-
-    req.documentFiles = req.files || [];
-    const invalid = req.documentFiles.map(documentValidationError).find(Boolean);
-    if (invalid) {
-      discardUploadedFiles(req.documentFiles);
-      return res.status(400).json({ error: invalid });
-    }
-
-    next();
-  });
-}
-
-// Build the metadata records up front (before the project ID exists) so the
-// spreadsheet row can include them; the temp files are moved into place after
-// the ID has been issued.
-function buildDocumentRecords(files, titles) {
-  return files.map((file, i) => ({
-    meta: {
-      id: crypto.randomBytes(8).toString('hex'),
-      fileName: file.originalname || 'document',
-      title: titles[i] || '',
-      size: file.size,
-      mimeType: file.mimetype || '',
-      storedName: '',
-      uploadedAt: new Date().toISOString(),
-    },
-    tempPath: file.path,
-  })).map(record => {
-    record.meta.storedName = `${record.meta.id}__${safeDocumentFileName(record.meta.fileName)}`;
-    return record;
-  });
-}
-
-async function writeDocumentFiles(projectId, records) {
-  if (!records.length) return;
-  if (USE_SUPABASE) {
-    for (const record of records) {
-      await supabase.uploadFile(
-        `projects/${projectId}/${record.meta.storedName}`,
-        record.tempPath,
-        record.meta.mimeType || 'application/octet-stream'
-      );
-      await fs.unlink(record.tempPath).catch(() => {});
-    }
-    return;
-  }
-  const dir = path.join(UPLOADS_DIR, projectId);
-  await fs.mkdir(dir, { recursive: true });
-  for (const record of records) {
-    await fs.rename(record.tempPath, path.join(dir, record.meta.storedName));
-  }
+  req.projectPayload = req.body || {};
+  next();
 }
 
 function documentsCellText(documents) {
@@ -635,7 +564,7 @@ function setProjectDocumentsCell(projectId, text) {
   return run;
 }
 
-async function saveProjectSubmission({ owner, actor, payload, documentRecords = [], status = 'Pending', activityType = 'project_submitted' }) {
+async function saveProjectSubmission({ owner, actor, payload, status = 'Pending', activityType = 'project_submitted' }) {
   const submission = {
     id: '',
     createdAt: new Date().toISOString(),
@@ -646,11 +575,12 @@ async function saveProjectSubmission({ owner, actor, payload, documentRecords = 
     phone: owner.phone || '',
     memberId: owner.memberId,
     status,
-    documents: documentRecords.map(record => record.meta),
+    // New projects carry no uploaded documents; supporting material lives in
+    // the member's own Google Drive folder, linked as `dataRoomUrl`.
+    documents: [],
   };
 
   submission.id = await appendProjectToSheet(submission);
-  await writeDocumentFiles(submission.id, documentRecords);
 
   const submissions = await readSubmissions();
   submissions.push(submission);
@@ -669,16 +599,6 @@ async function saveProjectSubmission({ owner, actor, payload, documentRecords = 
         ? `${who} created "${title}" for ${memberDisplayName(owner)}`
         : `${who} submitted "${title}"`,
     });
-    if (documentRecords.length) {
-      await portal.recordActivity({
-        type: 'documents_added',
-        actorMemberId: actor && actor.memberId,
-        actorName: who,
-        projectId: submission.id,
-        projectTitle: title,
-        summary: `${documentRecords.length} document${documentRecords.length === 1 ? '' : 's'} added to "${title}"`,
-      });
-    }
   });
 
   notifyAdjacentHolders(submission)
@@ -692,12 +612,13 @@ app.post('/api/projects', requireMemberApi, parseProjectSubmission, async (req, 
     // payload.tenures is an array of { tenureNumber, geojson }.
     // Attribute the project to the signed-in member (authoritative) with an
     // initial "Pending" status; the form fields carry the rest.
-    const documentRecords = buildDocumentRecords(req.documentFiles, req.documentTitles);
+    const dataRoom = parseDataRoomUrl(req.projectPayload.dataRoomUrl);
+    if (!dataRoom.ok) return res.status(400).json({ error: dataRoom.error });
+
     const submission = await saveProjectSubmission({
       owner: req.user,
       actor: req.user,
-      payload: req.projectPayload,
-      documentRecords,
+      payload: { ...req.projectPayload, dataRoomUrl: dataRoom.value },
     });
 
     res.status(201).json({ ok: true, id: submission.id });
@@ -710,30 +631,31 @@ app.post('/api/projects', requireMemberApi, parseProjectSubmission, async (req, 
     await run;
   } catch (error) {
     console.error(error);
-    discardUploadedFiles(req.documentFiles); // any temp files not yet moved into place
     if (!res.headersSent) res.status(500).json({ error: 'Could not save project submission.' });
   }
 });
 
-/* ── Edit and resubmit a rejected project ───────────────────────────────── */
+/* ── Edit a project ─────────────────────────────────────────────────────────
+ * Owners may edit their own projects at any point after submission; admins may
+ * edit anything on anyone's. Which fields each may touch is decided by
+ * projectEdits.planProjectEdit, and enforced here on every request — the
+ * interface hiding a control is a convenience, not the control itself.
+ * ──────────────────────────────────────────────────────────────────────────── */
 
-// Fields the owner may change when reworking a project. Tenures, ownership and
-// status are deliberately excluded — geometry is confirmed on the form, and
-// status is the reviewers' to set.
-const EDITABLE_PROJECT_FIELDS = [
-  'project', 'operator', 'description', 'commodities', 'depositTypes',
-  'projectStage', 'resourceEstimate', 'resourceSource', 'website',
-];
-
-app.put('/api/projects/:id', requireMemberApi, async (req, res) => {
+app.put('/api/projects/:id', requireMemberOrAdminApi, async (req, res) => {
   const run = submissionsWriteChain.catch(() => {}).then(async () => {
     const submissions = await readSubmissions();
     const submission = submissions.find(s => s.id === req.params.id);
     if (!submission) return res.status(404).json({ error: 'Project not found.' });
 
+    const admin = isAdmin(req.user);
     const owns = submission.memberId === req.user.memberId;
-    if (!owns && !isAdmin(req.user)) {
-      return res.status(403).json({ error: 'You can only edit your own projects.' });
+
+    const plan = planProjectEdit({ body: req.body, isOwner: owns, isAdmin: admin });
+    if (!plan.ok) return res.status(plan.status).json({ error: plan.error });
+
+    if (plan.changes.status !== undefined && !PROJECT_STATUSES.includes(plan.changes.status)) {
+      return res.status(400).json({ error: `Status must be one of: ${PROJECT_STATUSES.join(', ')}.` });
     }
 
     const rows = await listProjects();
@@ -741,23 +663,35 @@ app.put('/api/projects/:id', requireMemberApi, async (req, res) => {
     const status = row ? row.status : 'Pending';
     const resubmit = !!req.body.resubmit;
 
-    // Members may only rework a project the reviewers sent back.
-    if (owns && !isAdmin(req.user) && !RESUBMITTABLE_STATUSES.includes(status)) {
+    // Resubmission is still only for a project the reviewers sent back; a
+    // plain edit is allowed at any status.
+    if (resubmit && !admin && !RESUBMITTABLE_STATUSES.includes(status)) {
       return res.status(409).json({
-        error: `This project is "${status}" and can't be edited right now.`,
+        error: `This project is "${status}" and cannot be resubmitted.`,
       });
     }
 
-    for (const field of EDITABLE_PROJECT_FIELDS) {
-      if (req.body[field] === undefined) continue;
-      submission[field] = Array.isArray(req.body[field])
-        ? req.body[field].map(v => clampText(v, 120)).filter(Boolean)
-        : clampText(req.body[field], 4000);
-    }
+    Object.assign(submission, plan.changes);
     submission.updatedAt = new Date().toISOString();
+
+    // An admin reassigning ownership must carry the contact details with it,
+    // or the record keeps the previous owner's name and email.
+    if (admin && plan.changes.memberId) {
+      const users = await listUsers();
+      const owner = users.find(user => user.memberId === plan.changes.memberId);
+      if (!owner) return res.status(404).json({ error: 'No member has that member ID.' });
+      submission.firstName = owner.firstName || '';
+      submission.lastName = owner.lastName || '';
+      submission.email = owner.email || '';
+      submission.phone = owner.phone || '';
+    }
 
     await writeSubmissions(submissions);
     await syncProjectRow(submission);
+
+    if (admin) {
+      await syncProjectAdminCells(submission, plan.changes, status);
+    }
 
     if (resubmit) {
       await setProjectStatus(submission.id, 'Resubmitted', {
@@ -781,12 +715,14 @@ app.put('/api/projects/:id', requireMemberApi, async (req, res) => {
           actorName: memberDisplayName(req.user),
           projectId: submission.id,
           projectTitle: submission.project || submission.id,
-          summary: 'Project details were updated',
+          summary: plan.changedFields.length
+            ? `Project details were updated (${plan.changedFields.join(', ')})`
+            : 'Project details were updated',
         })
       );
     }
 
-    res.json({ ok: true, resubmitted: resubmit });
+    res.json({ ok: true, resubmitted: resubmit, changed: plan.changedFields });
   });
 
   submissionsWriteChain = run.catch(() => {});
@@ -810,6 +746,7 @@ async function doSyncProjectRow(submission) {
       resource_estimate: submission.resourceEstimate || '',
       resource_source: submission.resourceSource || '',
       website: submission.website || '',
+      data_room_url: submission.dataRoomUrl || '',
     });
     invalidateProjectsCache();
     return !!(updated && updated.length);
@@ -828,6 +765,7 @@ async function doSyncProjectRow(submission) {
     row.getCell(14).value = submission.resourceEstimate || '';
     row.getCell(15).value = submission.resourceSource || '';
     row.getCell(16).value = submission.website || '';
+    row.getCell(PROJECT_DATA_ROOM_COL).value = submission.dataRoomUrl || '';
     updated = true;
   });
   if (updated) {
@@ -839,6 +777,69 @@ async function doSyncProjectRow(submission) {
 
 function syncProjectRow(submission) {
   const run = projectsWriteChain.catch(() => {}).then(() => doSyncProjectRow(submission));
+  projectsWriteChain = run.catch(() => {});
+  return run;
+}
+
+/**
+ * Mirrors the administrative columns — status, review outcome, archive state
+ * and the member identity copied onto the row — which `syncProjectRow`
+ * deliberately leaves alone because members must never write them.
+ */
+async function doSyncProjectAdminCells(submission, changes, currentStatus) {
+  // The review columns travel with the status cell, so any change among them
+  // is written through the same path — using the row's existing status when
+  // the admin edited only the note.
+  const reviewChanged = ['status', 'reviewNote', 'reviewedBy', 'reviewedAt']
+    .some(field => changes[field] !== undefined);
+  if (reviewChanged) {
+    const status = changes.status !== undefined ? changes.status : (currentStatus || 'Pending');
+    await doSetProjectStatus(submission.id, status, {
+      note: submission.reviewNote || '',
+      reviewer: submission.reviewedBy || '',
+      at: submission.reviewedAt || new Date().toISOString(),
+    });
+  }
+  if (changes.archived !== undefined) {
+    await doSetProjectArchived(submission.id, changes.archived);
+  }
+
+  const identityChanged = ['memberId', 'firstName', 'lastName', 'email', 'phone']
+    .some(field => changes[field] !== undefined);
+  if (!identityChanged) return;
+
+  if (USE_SUPABASE) {
+    await supabase.update('projects', supabase.eq('id', submission.id), {
+      member_id: submission.memberId || '',
+      first_name: submission.firstName || '',
+      last_name: submission.lastName || '',
+      email: submission.email || '',
+      phone: submission.phone || '',
+    });
+    invalidateProjectsCache();
+    return;
+  }
+
+  const { wb, ws } = await getProjectsSheet();
+  let updated = false;
+  ws.eachRow((row, n) => {
+    if (n === 1 || updated) return;
+    if (cellText(row.getCell(PROJECT_ID_COL)) !== submission.id) return;
+    row.getCell(3).value = submission.memberId || '';
+    row.getCell(4).value = submission.firstName || '';
+    row.getCell(5).value = submission.lastName || '';
+    row.getCell(6).value = submission.email || '';
+    row.getCell(7).value = submission.phone || '';
+    updated = true;
+  });
+  if (updated) {
+    await writeWorkbookAtomic(wb, PROJECTS_XLSX);
+    invalidateProjectsCache();
+  }
+}
+
+function syncProjectAdminCells(submission, changes, currentStatus) {
+  const run = projectsWriteChain.catch(() => {}).then(() => doSyncProjectAdminCells(submission, changes, currentStatus));
   projectsWriteChain = run.catch(() => {});
   return run;
 }
@@ -1621,6 +1622,18 @@ function requireMemberApi(req, res, next) {
   next();
 }
 
+/**
+ * Editing a project needs an active membership — unless the actor is staff.
+ * Administrators are identified by ADMIN_EMAILS and are not necessarily paying
+ * members, so gating them behind the membership check would lock them out of
+ * the projects they are supposed to be able to edit.
+ */
+function requireMemberOrAdminApi(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Please sign in to continue.', auth: 'signin' });
+  if (isAdmin(req.user)) return next();
+  return requireMemberApi(req, res, next);
+}
+
 function requireMemberPage(req, res, next) {
   if (!req.user) return res.redirect(WIX_MEMBER_LOGIN_URL || '/signup.html');
   if (!isActiveMember(req.user)) return res.redirect('/membership.html');
@@ -1688,6 +1701,7 @@ function projectRowToObj(row) {
     reviewedAt: cellText(row.getCell(PROJECT_REVIEWED_AT_COL)),
     // Archived projects stay in the sheet but disappear from member views.
     archived: cellText(row.getCell(PROJECT_ARCHIVED_COL)).toLowerCase() === 'yes',
+    dataRoomUrl: cellText(row.getCell(PROJECT_DATA_ROOM_COL)),
   };
 }
 
@@ -2011,6 +2025,9 @@ function buildProjectRecord(submission, row, { includeGeometry = false } = {}) {
     resourceEstimate: submission.resourceEstimate || '',
     resourceSource: submission.resourceSource || '',
     website: submission.website || '',
+    // The Google Drive folder holding this project's documents, if the owner
+    // has provided one. Empty string means no data room.
+    dataRoomUrl: row.dataRoomUrl || submission.dataRoomUrl || '',
     createdAt: submission.createdAt,
     updatedAt: submission.updatedAt || submission.createdAt,
     year: String(submission.createdAt || '').slice(0, 4),
@@ -2640,7 +2657,13 @@ registerProfileRoutes(app, {
 // Admin: all projects + status updates (Pending → Submitted → Approved).
 app.get('/api/admin/projects', requireAdminApi, async (req, res) => {
   try {
-    res.json({ projects: await listProjects() });
+    // The row carries everything except the description, which lives with the
+    // submission payload — admins edit both from the same form.
+    const [projects, submissions] = await Promise.all([listProjects(), readSubmissions()]);
+    const descriptions = new Map(submissions.map(s => [s.id, s.description || '']));
+    res.json({
+      projects: projects.map(p => ({ ...p, description: descriptions.get(p.id) || '' })),
+    });
   } catch (error) {
     console.error('admin projects:', error.message);
     res.status(500).json({ error: 'Could not load projects.' });
@@ -2677,8 +2700,13 @@ app.post('/api/admin/projects', requireAdminApi, async (req, res) => {
 
     const rawStatus = String(req.body.status || 'Pending');
     const status = PROJECT_STATUSES.includes(rawStatus) ? rawStatus : 'Pending';
+
+    const dataRoom = parseDataRoomUrl(req.body.dataRoomUrl);
+    if (!dataRoom.ok) return res.status(400).json({ error: dataRoom.error });
+
     const payload = {
       project: title,
+      dataRoomUrl: dataRoom.value,
       operator: clampText(req.body.operator, 120),
       description: clampText(req.body.description, 4000),
       tenures,

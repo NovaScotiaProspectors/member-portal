@@ -21,6 +21,7 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
     const adminProjectCommodities = document.getElementById('adminProjectCommodities');
     const adminProjectDepositTypes = document.getElementById('adminProjectDepositTypes');
     const adminProjectDescription = document.getElementById('adminProjectDescription');
+    const adminProjectDataRoom = document.getElementById('adminProjectDataRoom');
 
     const PROJECT_STATUSES = ['Pending', 'Submitted', 'Under Review', 'Approved', 'Revisions Requested', 'Rejected', 'Resubmitted'];
     let allMembers = [];
@@ -66,11 +67,97 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
 
     function projectActions(p) {
       return `<div class="admin-action-group">
+        <button type="button" class="secondary-btn admin-mini-btn project-edit-btn" data-id="${esc(p.id)}">Edit</button>
         <button type="button" class="secondary-btn admin-mini-btn project-archive-btn" data-id="${esc(p.id)}" data-archived="${p.archived ? 'true' : 'false'}">
           ${p.archived ? 'Restore' : 'Archive'}
         </button>
         <button type="button" class="text-danger-btn admin-mini-danger project-delete-btn" data-id="${esc(p.id)}" data-title="${esc(p.title || p.id)}">Delete</button>
       </div>`;
+    }
+
+    /* Administrators may edit every field on any project, including ownership
+       and the administrative ones. The server enforces this independently —
+       this form is the convenience, PUT /api/projects/:id is the rule. */
+    function projectEditRow(p) {
+      const field = (name, label, value, type = 'text') => `
+        <div class="field">
+          <label for="ap-${name}-${esc(p.id)}">${esc(label)}</label>
+          <input type="${type}" id="ap-${name}-${esc(p.id)}" name="${name}" value="${esc(value || '')}" />
+        </div>`;
+
+      return `
+        <tr class="admin-edit-row" data-edit-for="${esc(p.id)}" hidden>
+          <td colspan="6">
+            <form class="admin-project-form" data-id="${esc(p.id)}">
+              <p class="section-label small">Edit ${esc(p.title || p.id)}</p>
+              <div class="grid-2">
+                ${field('project', 'Project name', p.title)}
+                ${field('operator', 'Operator', p.operator)}
+                <div class="field full">
+                  <label for="ap-description-${esc(p.id)}">Description</label>
+                  <textarea id="ap-description-${esc(p.id)}" name="description">${esc(p.description || '')}</textarea>
+                </div>
+                ${field('commodities', 'Commodities', p.commodities)}
+                ${field('depositTypes', 'Deposit types', p.depositTypes)}
+                ${field('projectStage', 'Project stage', p.projectStage)}
+                ${field('resourceSource', 'Resource source', p.resourceSource)}
+                <div class="field full">
+                  <label for="ap-resourceEstimate-${esc(p.id)}">Resource estimate</label>
+                  <textarea id="ap-resourceEstimate-${esc(p.id)}" name="resourceEstimate">${esc(p.resourceEstimate || '')}</textarea>
+                </div>
+                ${field('website', 'Website', p.website, 'url')}
+                ${field('dataRoomUrl', 'Data Room (Google Drive link)', p.dataRoomUrl, 'url')}
+
+                <div class="field full"><p class="section-label small">Administrative</p></div>
+                ${field('memberId', 'Owner (member ID)', p.memberId)}
+                <div class="field">
+                  <label for="ap-status-${esc(p.id)}">Status</label>
+                  <select id="ap-status-${esc(p.id)}" name="status">
+                    ${PROJECT_STATUSES.map(st =>
+                      `<option value="${esc(st)}"${st === p.status ? ' selected' : ''}>${esc(st)}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="ap-archived-${esc(p.id)}">Archived</label>
+                  <select id="ap-archived-${esc(p.id)}" name="archived">
+                    <option value="false"${p.archived ? '' : ' selected'}>Visible</option>
+                    <option value="true"${p.archived ? ' selected' : ''}>Archived</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="ap-reviewNote-${esc(p.id)}">Internal review note</label>
+                  <textarea id="ap-reviewNote-${esc(p.id)}" name="reviewNote">${esc(p.reviewNote || '')}</textarea>
+                </div>
+              </div>
+              <div class="admin-action-group">
+                <button type="submit" class="submit-btn">Save Changes</button>
+                <button type="button" class="secondary-btn project-edit-cancel">Cancel</button>
+              </div>
+            </form>
+          </td>
+        </tr>`;
+    }
+
+    async function saveProjectEdits(ev, form) {
+      ev.preventDefault();
+      const submitBtn = form.querySelector('button[type=submit]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+      try {
+        const payload = {};
+        form.querySelectorAll('[name]').forEach(el => { payload[el.name] = el.value; });
+        await api(`/api/projects/${encodeURIComponent(form.dataset.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        showToast('Project updated.', 'success');
+        await loadProjects();
+      } catch (e) {
+        showToast(e.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
     }
 
     async function loadOverview() {
@@ -246,13 +333,33 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
         }
         projectsBody.innerHTML = projects.map(p => `
           <tr>
-            <td><strong>${esc(p.title) || '-'}</strong><br><span class="project-date">${esc(p.id)}</span></td>
+            <td>
+              <strong>${esc(p.title) || '-'}</strong><br>
+              <span class="project-date">${esc(p.id)}</span>
+              ${p.dataRoomUrl
+                ? `<br><a class="data-room-link" href="${esc(p.dataRoomUrl)}" target="_blank"
+                         rel="noopener noreferrer external">Open Data Room<span class="sr-only"> (opens in a new tab)</span></a>`
+                : ''}
+            </td>
             <td class="mono">${esc(p.memberId) || '-'}</td>
             <td>${fmtDate(p.createdAt)}</td>
             <td>${projectStatusSelect(p)}</td>
             <td>${p.archived ? '<span class="status-badge status-inactive">Archived</span>' : '<span class="status-badge status-active">Visible</span>'}</td>
             <td>${projectActions(p)}</td>
-          </tr>`).join('');
+          </tr>
+          ${projectEditRow(p)}`).join('');
+        projectsBody.querySelectorAll('.project-edit-btn').forEach(btn => btn.addEventListener('click', () => {
+          const row = projectsBody.querySelector(`.admin-edit-row[data-edit-for="${CSS.escape(btn.dataset.id)}"]`);
+          if (!row) return;
+          row.hidden = !row.hidden;
+          if (!row.hidden) row.querySelector('input, textarea, select')?.focus();
+        }));
+        projectsBody.querySelectorAll('.project-edit-cancel').forEach(btn => btn.addEventListener('click', () => {
+          const row = btn.closest('.admin-edit-row');
+          if (row) row.hidden = true;
+        }));
+        projectsBody.querySelectorAll('.admin-project-form').forEach(form =>
+          form.addEventListener('submit', ev => saveProjectEdits(ev, form)));
         projectsBody.querySelectorAll('.status-select').forEach(sel => sel.addEventListener('change', () => updateProjectStatus(sel)));
         projectsBody.querySelectorAll('.project-archive-btn').forEach(btn => btn.addEventListener('click', () => archiveProject(btn)));
         projectsBody.querySelectorAll('.project-delete-btn').forEach(btn => btn.addEventListener('click', () => deleteProject(btn)));
@@ -275,6 +382,7 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
             commodities: adminProjectCommodities.value,
             depositTypes: adminProjectDepositTypes.value,
             description: adminProjectDescription.value,
+            dataRoomUrl: adminProjectDataRoom ? adminProjectDataRoom.value : '',
           }),
         });
         showToast('Project created and assigned.', 'success');

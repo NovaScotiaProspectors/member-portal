@@ -223,6 +223,10 @@
           </dl>
           <div class="map-popup-actions">
             <a class="submit-btn map-popup-view" href="/project.html?id=${encodeURIComponent(p.id)}">View Project</a>
+            ${p.dataRoomUrl
+              ? `<a class="secondary-btn map-popup-dataroom" href="${esc(p.dataRoomUrl)}"
+                     target="_blank" rel="noopener noreferrer external">Open Data Room<span class="sr-only"> (opens in a new tab)</span></a>`
+              : ''}
             ${canSaveProjects ? favoriteButton(p.id, savedIds.has(p.id)) : ''}
           </div>
         </article>`;

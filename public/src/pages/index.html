@@ -183,22 +183,23 @@
       </div>
 
       <div class="form-section">
-        <p class="section-label">Additional Documents</p>
+        <p class="section-label">Data Room</p>
 
         <div class="doc-section">
-          <div class="doc-section-header">
-            <p class="field-label">Supporting Documents</p>
-            <button type="button" class="secondary-btn tenure-add-btn" id="add-document-btn">
-              <svg viewBox="0 0 14 14" width="12" height="12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
-              Add Another Document
-            </button>
+          <p class="doc-section-hint">
+            Optional — keep your supporting documents (reports, assays, maps, photos) in a
+            Google Drive folder and paste the sharing link here. Make sure the folder's sharing
+            settings let NSPA reviewers open it. You can add or change this link later from your
+            dashboard.
+          </p>
+
+          <div class="field">
+            <label for="data-room-url">Google Drive folder link</label>
+            <input type="url" id="data-room-url" name="data-room-url"
+                   placeholder="https://drive.google.com/drive/folders/..."
+                   aria-describedby="data-room-error" />
+            <p class="field-error" id="data-room-error" hidden></p>
           </div>
-
-          <p class="doc-section-hint">Optional — attach reports, assays, maps or photos. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG. Up to 100 MB per file, 10 files max.</p>
-
-          <div id="document-entries-container" class="tenure-entries-container"></div>
         </div>
       </div>
     </div>

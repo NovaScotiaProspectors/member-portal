@@ -102,6 +102,7 @@ async function migrateProjects() {
       website: text(row.getCell(16)),
       status: text(row.getCell(17)) || 'Pending',
       documents_text: text(row.getCell(18)),
+      data_room_url: text(row.getCell(23)),
       review_note: text(row.getCell(19)),
       reviewed_by: text(row.getCell(20)),
       reviewed_at: text(row.getCell(21)) || null,

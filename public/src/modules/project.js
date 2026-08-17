@@ -49,6 +49,17 @@
       ['Last updated', esc(fmtDate(p.updatedAt))],
     ].filter(([, v]) => v);
 
+    // The member's own Google Drive folder of supporting documents. Opened in
+    // a new tab, with noopener so the opened page cannot reach back through
+    // window.opener, and noreferrer so the Drive link carries no referrer.
+    const dataRoomBlock = () => p.dataRoomUrl
+      ? `<a class="submit-btn data-room-btn" href="${esc(p.dataRoomUrl)}"
+             target="_blank" rel="noopener noreferrer external">
+            Open Data Room<span class="sr-only"> (opens in a new tab)</span>
+         </a>
+         <p class="form-hint">The project's supporting documents, in Google Drive.</p>`
+      : '<p class="form-hint">No Data Room has been linked for this project.</p>';
+
     const docRow = d => `
       <div class="doc-item">
         <a class="doc-download" href="/api/projects/${encodeURIComponent(p.id)}/documents/${encodeURIComponent(d.id)}/download"
@@ -119,12 +130,19 @@
 
       <div class="stack-card">
         <div class="form-section">
-          <p class="section-label">Documents</p>
-          ${p.documents.length
-            ? `<div class="doc-list">${p.documents.map(docRow).join('')}</div>`
-            : '<p class="form-hint">No documents have been attached to this project.</p>'}
+          <p class="section-label">Data Room</p>
+          ${dataRoomBlock()}
         </div>
       </div>
+
+      ${p.documents.length ? `
+      <div class="stack-card">
+        <div class="form-section">
+          <p class="section-label">Documents</p>
+          <p class="form-hint">Attached before the Data Room replaced file uploads.</p>
+          <div class="doc-list">${p.documents.map(docRow).join('')}</div>
+        </div>
+      </div>` : ''}
 
       <div class="stack-card">
         <div class="form-section">

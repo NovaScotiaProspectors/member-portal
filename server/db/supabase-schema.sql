@@ -45,8 +45,14 @@ create table if not exists projects (
   review_note text not null default '',
   reviewed_by text not null default '',
   reviewed_at timestamptz,
-  archived boolean not null default false
+  archived boolean not null default false,
+  -- Google Drive folder link supplied by the project owner, replacing the
+  -- per-project file uploads. Empty string means the owner has not set one.
+  data_room_url text not null default ''
 );
+
+-- Existing deployments: add the column without touching any existing row.
+alter table projects add column if not exists data_room_url text not null default '';
 
 create index if not exists projects_member_idx on projects (member_id);
 create index if not exists projects_status_idx on projects (status, archived);

@@ -304,178 +304,48 @@ function normalizeTenureNumber(value) {
   return String(value || '').trim().toUpperCase();
 }
 
-/* ── Additional documents ─────────────────────────────────────────────── */
+/* ── Data Room ─────────────────────────────────────────────────────────────
+ * Supporting documents are no longer uploaded through this form. A project
+ * links to a Google Drive folder the member controls, so the same validation
+ * the server applies is mirrored here to catch mistakes before submitting.
+ * ──────────────────────────────────────────────────────────────────────── */
 
-const DOC_ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.jpg', '.jpeg', '.png'];
-const DOC_MAX_SIZE = 100 * 1024 * 1024; // 100 MB per file
-const DOC_MAX_COUNT = 10;
+const DATA_ROOM_HOSTS = ['drive.google.com', 'docs.google.com'];
 
-let documentEntryCounter = 0;
-const documentEntries = [];
+function validateDataRoomUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null; // optional — an empty field is fine
 
-function validateDocumentFile(file) {
-  const dot = file.name.lastIndexOf('.');
-  const ext = dot === -1 ? '' : file.name.slice(dot).toLowerCase();
-  if (!DOC_ALLOWED_EXTENSIONS.includes(ext)) {
-    return `"${file.name}" is not an accepted file type. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.`;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return 'Enter the full link, starting with https://';
   }
-  if (file.size > DOC_MAX_SIZE) {
-    return `"${file.name}" is ${formatFileSize(file.size)} — documents must be 100 MB or smaller.`;
+  if (url.protocol !== 'https:') {
+    return 'The link must start with https://';
   }
-  if (file.size === 0) {
-    return `"${file.name}" is empty.`;
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (!DATA_ROOM_HOSTS.includes(host)) {
+    return 'Enter a Google Drive link (drive.google.com or docs.google.com).';
   }
   return null;
 }
 
-function formatFileSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+const dataRoomInput = document.getElementById('data-room-url');
+const dataRoomError = document.getElementById('data-room-error');
+
+function showDataRoomError(message) {
+  if (!dataRoomError) return;
+  dataRoomError.textContent = message || '';
+  dataRoomError.hidden = !message;
+  if (dataRoomInput) dataRoomInput.setAttribute('aria-invalid', message ? 'true' : 'false');
 }
 
-class DocumentEntry {
-  constructor(container) {
-    this.id = ++documentEntryCounter;
-    this.file = null;
-
-    this.el = this._buildDOM();
-    container.appendChild(this.el);
-    this._bindEvents();
-  }
-
-  _buildDOM() {
-    const entry = document.createElement('div');
-    entry.className = 'doc-entry';
-    entry.dataset.entryId = this.id;
-
-    entry.innerHTML = `
-      <div class="tenure-entry-header">
-        <span class="tenure-entry-label doc-entry-label">Document #${this.id}</span>
-        <button type="button" class="tenure-remove-btn doc-remove-btn" aria-label="Remove document">
-          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="doc-file-row">
-        <input type="file" class="doc-file-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png"
-               aria-label="Choose file for document ${this.id}" hidden />
-        <button type="button" class="secondary-btn doc-choose-btn">
-          <svg viewBox="0 0 14 14" width="12" height="12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M7 9V1.8M4 4.5L7 1.5l3 3M2 9.5V11a1.5 1.5 0 001.5 1.5h7A1.5 1.5 0 0012 11V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Choose File
-        </button>
-        <span class="doc-file-name">No file selected</span>
-      </div>
-
-      <input type="text" class="doc-title-input" maxlength="200"
-             aria-label="Title or description for document ${this.id}"
-             placeholder="Document title or description (optional)" />
-      <p class="doc-error" role="alert" hidden></p>
-    `;
-
-    return entry;
-  }
-
-  _bindEvents() {
-    this.fileInput  = this.el.querySelector('.doc-file-input');
-    this.chooseBtn  = this.el.querySelector('.doc-choose-btn');
-    this.fileNameEl = this.el.querySelector('.doc-file-name');
-    this.titleInput = this.el.querySelector('.doc-title-input');
-    this.errorEl    = this.el.querySelector('.doc-error');
-    this.removeBtn  = this.el.querySelector('.doc-remove-btn');
-
-    this.chooseBtn.addEventListener('click', () => this.fileInput.click());
-    this.fileInput.addEventListener('change', () => this._onFileChange());
-    this.removeBtn.addEventListener('click', () => this._remove());
-  }
-
-  _onFileChange() {
-    this.clearError();
-    const file = this.fileInput.files[0] || null;
-
-    if (!file) {
-      this.file = null;
-      this.fileNameEl.textContent = 'No file selected';
-      this.el.classList.remove('has-file');
-      return;
-    }
-
-    const error = validateDocumentFile(file);
-    if (error) {
-      this.fileInput.value = '';
-      this.file = null;
-      this.fileNameEl.textContent = 'No file selected';
-      this.el.classList.remove('has-file');
-      this.showError(error);
-      showToast(error, 'error');
-      return;
-    }
-
-    this.file = file;
-    this.fileNameEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
-    this.el.classList.add('has-file');
-  }
-
-  showError(message) {
-    this.errorEl.textContent = message;
-    this.errorEl.hidden = false;
-    this.el.classList.add('has-error');
-  }
-
-  clearError() {
-    this.errorEl.hidden = true;
-    this.el.classList.remove('has-error');
-  }
-
-  get title() {
-    return this.titleInput.value.trim();
-  }
-
-  _remove() {
-    this.el.remove();
-
-    const idx = documentEntries.indexOf(this);
-    if (idx !== -1) documentEntries.splice(idx, 1);
-
-    if (documentEntries.length === 0) {
-      addDocumentEntry(); // also renumbers
-    } else {
-      renumberDocuments();
-    }
-  }
-}
-
-function renumberDocuments() {
-  documentEntries.forEach((entry, i) => {
-    entry.el.querySelector('.doc-entry-label').textContent = `Document #${i + 1}`;
-  });
-}
-
-function addDocumentEntry() {
-  const container = document.getElementById('document-entries-container');
-  const entry = new DocumentEntry(container);
-  documentEntries.push(entry);
-  renumberDocuments();
-  return entry;
-}
-
-document.getElementById('add-document-btn').addEventListener('click', () => {
-  if (documentEntries.length >= DOC_MAX_COUNT) {
-    showToast(`You can attach at most ${DOC_MAX_COUNT} documents.`, 'error');
-    return;
-  }
-  addDocumentEntry();
-});
-
-addDocumentEntry();
-
-function resetDocumentEntries() {
-  documentEntries.splice(0).forEach(entry => entry.el.remove());
-  addDocumentEntry();
+if (dataRoomInput) {
+  // Clear the complaint as soon as they start fixing it.
+  dataRoomInput.addEventListener('input', () => showDataRoomError(''));
+  dataRoomInput.addEventListener('blur', () => showDataRoomError(validateDataRoomUrl(dataRoomInput.value)));
 }
 
 async function fetchTenureGeometry(tenureNumber) {
@@ -827,19 +697,13 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     return;
   }
 
-  // Re-validate the attached documents just before submission.
-  const filledDocuments = documentEntries.filter(e => e.file);
-  for (const entry of filledDocuments) {
-    const error = validateDocumentFile(entry.file);
-    if (error) {
-      entry.showError(error);
-      entry.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      showToast(error, 'error');
-      return;
-    }
-  }
-  if (filledDocuments.length > DOC_MAX_COUNT) {
-    showToast(`You can attach at most ${DOC_MAX_COUNT} documents.`, 'error');
+  // Re-check the Data Room link just before submission.
+  const dataRoomUrl = dataRoomInput ? dataRoomInput.value.trim() : '';
+  const dataRoomProblem = validateDataRoomUrl(dataRoomUrl);
+  if (dataRoomProblem) {
+    showDataRoomError(dataRoomProblem);
+    if (dataRoomInput) dataRoomInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast(dataRoomProblem, 'error');
     return;
   }
 
@@ -865,36 +729,25 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     resourceEstimate: document.getElementById('resource-estimate-id').value.trim(),
     resourceSource:  document.getElementById('resource-estimate-source').value.trim(),
     website:         document.getElementById('website-link').value.trim(),
+    dataRoomUrl,
   };
 
   console.log('Submission:', submission);
 
   try {
-    // Documents ride along as multipart/form-data; a plain JSON body is kept
-    // for submissions with no attachments.
-    let fetchOptions;
-    if (filledDocuments.length > 0) {
-      const formData = new FormData();
-      formData.append('payload', JSON.stringify(submission));
-      formData.append('documentTitles', JSON.stringify(filledDocuments.map(e => e.title)));
-      filledDocuments.forEach(e => formData.append('documents', e.file, e.file.name));
-      fetchOptions = { method: 'POST', body: formData };
-    } else {
-      fetchOptions = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submission),
-      };
-    }
-
-    const response = await fetch('/api/projects', fetchOptions);
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submission),
+    });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Submission failed');
     }
 
-    resetDocumentEntries();
+    if (dataRoomInput) dataRoomInput.value = '';
+    showDataRoomError('');
     showToast(`Project submitted — thank you, ${firstName}!`, 'success');
   } catch (error) {
     console.error(error);

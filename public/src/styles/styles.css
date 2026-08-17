@@ -2915,6 +2915,38 @@ input:-webkit-autofill:active {
 
 .doc-download:hover { text-decoration: underline; }
 
+/* ── Data Room ─────────────────────────────────────────────────────────────
+   The Google Drive folder a member links instead of uploading files. The
+   button form is used where it is the section's main action; the inline link
+   form inside dashboards, admin tables and map popups. */
+
+.data-room-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+}
+
+.data-room-link {
+  color: var(--gold-light);
+  text-decoration: none;
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.data-room-link:hover { text-decoration: underline; }
+
+.map-popup-dataroom { white-space: nowrap; }
+
+/* The admin edit panel opens as a full-width row beneath its project. */
+.admin-edit-row > td {
+  background: var(--surface-2, rgba(255,255,255,0.02));
+  padding: var(--space-4);
+}
+
+.admin-project-form .grid-2 { margin-bottom: var(--space-3); }
+
+
 .doc-item-meta {
   font-family: var(--font-mono);
   font-size: 12.5px;

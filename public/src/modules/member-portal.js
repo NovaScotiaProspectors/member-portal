@@ -548,6 +548,31 @@ if (location.pathname === '/dashboard.html') {
           return `${(n / (1024 * 1024)).toFixed(1)} MB`;
         };
     
+        // Opened in a new tab; noopener stops the opened page reaching back
+        // through window.opener, noreferrer keeps the referrer off the request.
+        function dataRoomBlock(p) {
+          if (!p.dataRoomUrl) return '';
+          return `
+            <div class="dash-detail-row">
+              <span class="dash-key">Data Room</span>
+              <span class="dash-val">
+                <a class="data-room-link" href="${esc(p.dataRoomUrl)}"
+                   target="_blank" rel="noopener noreferrer external">
+                  Open Data Room<span class="sr-only"> (opens in a new tab)</span>
+                </a>
+              </span>
+            </div>`;
+        }
+
+        // The review callout carries its own Edit button when a project was
+        // sent back; every other project gets one here.
+        function editActions(p) {
+          if (p.canResubmit) return '';
+          return `<div class="dash-actions">
+                    <button type="button" class="secondary-btn resubmit-open-btn" data-id="${esc(p.id)}">Edit Project</button>
+                  </div>`;
+        }
+
         function documentsBlock(p) {
           const docs = p.documents || [];
           if (!docs.length) return '';
@@ -620,11 +645,12 @@ if (location.pathname === '/dashboard.html') {
             </div>`;
         }
     
-        function resubmitForm(p) {
-          if (!p.canResubmit) return '';
+        // Owners may edit their own projects at any status. Resubmission is
+        // the extra step, offered only when reviewers have sent it back.
+        function editForm(p) {
           return `
             <form class="resubmit-form" data-id="${esc(p.id)}" hidden>
-              <p class="section-label small">Update your project</p>
+              <p class="section-label small">Edit your project</p>
               <div class="grid-2">
                 <div class="field">
                   <label for="rs-title-${esc(p.id)}">Project name</label>
@@ -650,12 +676,35 @@ if (location.pathname === '/dashboard.html') {
                   <label for="rs-website-${esc(p.id)}">Website</label>
                   <input type="text" id="rs-website-${esc(p.id)}" name="website" value="${esc(p.website || '')}" />
                 </div>
+                <div class="field">
+                  <label for="rs-stage-${esc(p.id)}">Project stage</label>
+                  <input type="text" id="rs-stage-${esc(p.id)}" name="projectStage" value="${esc(p.projectStage || '')}" />
+                </div>
+                <div class="field">
+                  <label for="rs-commodities-${esc(p.id)}">Commodities</label>
+                  <input type="text" id="rs-commodities-${esc(p.id)}" name="commodities" value="${esc(p.commodities || '')}"
+                         placeholder="Comma separated" />
+                </div>
+                <div class="field">
+                  <label for="rs-deposits-${esc(p.id)}">Deposit types</label>
+                  <input type="text" id="rs-deposits-${esc(p.id)}" name="depositTypes" value="${esc(p.depositTypes || '')}"
+                         placeholder="Comma separated" />
+                </div>
+                <div class="field full">
+                  <label for="rs-dataroom-${esc(p.id)}">Data Room (Google Drive folder link)</label>
+                  <input type="url" id="rs-dataroom-${esc(p.id)}" name="dataRoomUrl" value="${esc(p.dataRoomUrl || '')}"
+                         placeholder="https://drive.google.com/drive/folders/..." />
+                  <p class="form-hint">Leave blank to remove the link.</p>
+                </div>
               </div>
               <div class="dash-actions">
-                <button type="submit" class="submit-btn">Resubmit for Review</button>
+                <button type="submit" class="submit-btn" data-resubmit="false">Save Changes</button>
+                ${p.canResubmit
+                  ? '<button type="submit" class="submit-btn" data-resubmit="true">Save &amp; Resubmit</button>'
+                  : ''}
                 <button type="button" class="secondary-btn resubmit-cancel-btn">Cancel</button>
               </div>
-              <p class="form-hint">Tenure numbers and documents are unchanged. To edit those, use the project form.</p>
+              <p class="form-hint">Tenure numbers are set on the project form and are not editable here.</p>
             </form>`;
         }
     
@@ -672,7 +721,8 @@ if (location.pathname === '/dashboard.html') {
           ].filter(([, v]) => v);
           const detailRows = rows.map(([k, v]) =>
             `<div class="dash-detail-row"><span class="dash-key">${esc(k)}</span><span class="dash-val">${esc(v)}</span></div>`).join('');
-          const body = reviewTimeline(p) + reviewBlock(p) + resubmitForm(p) + detailRows + documentsBlock(p);
+          const body = reviewTimeline(p) + reviewBlock(p) + editActions(p) + editForm(p)
+            + detailRows + dataRoomBlock(p) + documentsBlock(p);
           return `<div class="project-detail">${body ||
             '<p class="form-hint">No further details recorded.</p>'}</div>`;
         }
@@ -721,31 +771,71 @@ if (location.pathname === '/dashboard.html') {
               if (open) { open.hidden = false; open.focus(); }
             });
           });
+          // Which button was used decides whether this is a plain save or a
+          // resubmission; the flag is read in the submit handler.
+          projectsBody.querySelectorAll('.resubmit-form button[type=submit]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const form = btn.closest('.resubmit-form');
+              if (form) form.dataset.resubmit = btn.dataset.resubmit || 'false';
+            });
+          });
           projectsBody.querySelectorAll('.resubmit-form').forEach(form => {
-            form.addEventListener('submit', ev => resubmitProject(ev, form));
+            form.addEventListener('submit', ev => saveProject(ev, form));
           });
         }
     
-        async function resubmitProject(ev, form) {
-          ev.preventDefault();
-          const submitBtn = form.querySelector('button[type=submit]');
-          submitBtn.disabled = true;
-          submitBtn.textContent = 'Resubmitting…';
+        // Mirrors the server's rule so an obvious mistake is caught before the
+        // round trip; the server validates it again regardless.
+        function dataRoomProblem(value) {
+          const raw = String(value || '').trim();
+          if (!raw) return null;
+          let url;
           try {
-            const payload = { resubmit: true };
-            form.querySelectorAll('[name]').forEach(el => { payload[el.name] = el.value; });
+            url = new URL(raw);
+          } catch {
+            return 'Enter the full Data Room link, starting with https://';
+          }
+          if (url.protocol !== 'https:') return 'The Data Room link must start with https://';
+          const host = url.hostname.toLowerCase().replace(/^www\./, '');
+          if (!['drive.google.com', 'docs.google.com'].includes(host)) {
+            return 'The Data Room link must be a Google Drive link.';
+          }
+          return null;
+        }
+
+        async function saveProject(ev, form) {
+          ev.preventDefault();
+          const resubmit = form.dataset.resubmit === 'true';
+          const buttons = [...form.querySelectorAll('button')];
+          const submitBtn = form.querySelector(`button[data-resubmit="${resubmit}"]`)
+            || form.querySelector('button[type=submit]');
+          const originalLabel = submitBtn.textContent;
+
+          const payload = resubmit ? { resubmit: true } : {};
+          form.querySelectorAll('[name]').forEach(el => { payload[el.name] = el.value; });
+
+          const problem = dataRoomProblem(payload.dataRoomUrl);
+          if (problem) {
+            showToast(problem, 'error');
+            form.querySelector('[name=dataRoomUrl]')?.focus();
+            return;
+          }
+
+          buttons.forEach(b => { b.disabled = true; });
+          submitBtn.textContent = resubmit ? 'Resubmitting…' : 'Saving…';
+          try {
             await api(`/api/projects/${encodeURIComponent(form.dataset.id)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
-            showToast('Project resubmitted for review.', 'success');
+            showToast(resubmit ? 'Project resubmitted for review.' : 'Project updated.', 'success');
             const { projects } = await api('/api/my/projects');
             renderProjects(projects);
           } catch (e) {
             showToast(e.message, 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Resubmit for Review';
+            buttons.forEach(b => { b.disabled = false; });
+            submitBtn.textContent = originalLabel;
           }
         }
     
