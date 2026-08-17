@@ -35,7 +35,7 @@ function registerAdminRoutes(app, ctx) {
     const status = await verifyMailer();
     if (!status.configured) {
       return res.status(503).json({
-        error: 'Email is not configured. Set RESEND_API_KEY (or SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) in the environment, then restart.',
+        error: 'Email is not configured. Set MAILERSEND_API_KEY and MAIL_FROM in the environment, then restart.',
         ...status,
       });
     }
@@ -44,15 +44,20 @@ function registerAdminRoutes(app, ctx) {
     }
 
     const to = String(req.body.to || req.user.email || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ error: 'Give a valid recipient address to test with.', ...status });
+    }
     try {
-      await mailer.sendMail({
+      const result = await mailer.sendMail({
         from: mailFrom,
         to,
         subject: 'NSPA test email',
         text: 'This is a test from the NSPA member portal. If you received it, claim alerts will be emailed.\n',
       });
-      res.json({ ok: true, sentTo: to, ...status });
+      res.json({ ok: true, sentTo: to, providerId: (result && result.id) || null, ...status });
     } catch (error) {
+      // mail.js has already scrubbed the API key out of this message.
+      console.warn('admin mail test: send failed —', error.message);
       res.status(502).json({ error: `Could not send: ${error.message}`, ...status });
     }
   });

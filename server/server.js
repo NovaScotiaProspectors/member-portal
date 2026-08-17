@@ -2056,11 +2056,11 @@ async function visibleProjectRecords(user, { includeGeometry = false } = {}) {
 
 
 
-/* ── Optional outbound email ────────────────────────────────────────────────
- * Configured through RESEND_API_KEY, or SMTP_* as a fallback (see mail.js for
- * why Resend is preferred). When neither is set, every caller silently falls
- * back to the in-app notification, which is the channel members actually rely
- * on — so a missing mail server is never a broken feature.
+/* ── Outbound email ─────────────────────────────────────────────────────────
+ * Sent over the MailerSend HTTPS API (see mail.js). When MAILERSEND_API_KEY is unset,
+ * every caller falls back to the in-app notification, which is the channel
+ * members actually rely on — so unconfigured email is degraded, not broken.
+ * Every skip and every provider failure is logged, so it is never silent.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const MAIL_FROM = process.env.MAIL_FROM || 'NSPA <no-reply@prospectors.ns.ca>';
@@ -2070,12 +2070,12 @@ let mailer = mailSetup.mailer;
 let mailStatus = mailSetup.status;
 const MAIL_TRANSPORT = mailSetup.describe;
 
-if (!mailer && mailStatus.error && mailStatus.error !== 'Neither RESEND_API_KEY nor SMTP_HOST is set') {
-  console.warn('mail: transport unavailable —', mailStatus.error);
+if (!mailer && mailStatus.error) {
+  console.warn('mail: outbound email is off —', mailStatus.error);
 }
 
 /**
- * Checks the credentials actually work. Without this a bad app password stays
+ * Checks the credentials actually work. Without this a rejected API key stays
  * invisible until a real alert silently fails to send.
  */
 async function verifyMailer() {
@@ -2089,21 +2089,51 @@ async function verifyMailer() {
   return mailStatus;
 }
 
-function sendMailIfConfigured({ to, subject, text, attachments }) {
-  if (!mailer || !to) return false;
-  mailer.sendMail({ from: MAIL_FROM, to, subject, text, attachments })
-    .catch(error => console.warn('mail send:', error.message));
+/**
+ * Diagnostics for a send, with no address or secret in the line: recipients are
+ * counted, not named, and mail.js has already scrubbed the key from `reason`.
+ */
+function logMailOutcome(level, subject, recipients, reason) {
+  const count = Array.isArray(recipients) ? recipients.length : (recipients ? 1 : 0);
+  const line = `mail: ${level} — subject="${subject || '(none)'}" recipients=${count}` +
+               (reason ? ` reason=${reason}` : '');
+  if (level === 'sent') console.log(line);
+  else console.warn(line);
+}
+
+/** Fire-and-forget. Returns whether the send was attempted at all. */
+function sendMailIfConfigured({ to, subject, text, html, attachments }) {
+  if (!mailer) {
+    logMailOutcome('skipped', subject, to, mailStatus.error || 'email is not configured');
+    return false;
+  }
+  if (!to) {
+    logMailOutcome('skipped', subject, to, 'no recipient address');
+    return false;
+  }
+  mailer.sendMail({ from: MAIL_FROM, to, subject, text, html, attachments })
+    .then(() => logMailOutcome('sent', subject, to))
+    .catch(error => logMailOutcome('failed', subject, to, error.message));
   return true;
 }
 
 /** Same, but reports whether delivery actually succeeded. */
-async function sendMailAwaited({ to, subject, text, attachments }) {
-  if (!mailer) return { sent: false, reason: 'Email is not configured' };
-  if (!to) return { sent: false, reason: 'No recipient address' };
+async function sendMailAwaited({ to, subject, text, html, attachments }) {
+  if (!mailer) {
+    const reason = mailStatus.error || 'Email is not configured';
+    logMailOutcome('skipped', subject, to, reason);
+    return { sent: false, reason };
+  }
+  if (!to) {
+    logMailOutcome('skipped', subject, to, 'no recipient address');
+    return { sent: false, reason: 'No recipient address' };
+  }
   try {
-    await mailer.sendMail({ from: MAIL_FROM, to, subject, text, attachments });
+    await mailer.sendMail({ from: MAIL_FROM, to, subject, text, html, attachments });
+    logMailOutcome('sent', subject, to);
     return { sent: true };
   } catch (error) {
+    logMailOutcome('failed', subject, to, error.message);
     return { sent: false, reason: error.message };
   }
 }
@@ -2429,7 +2459,7 @@ function deliverClaimAlert(payload) {
       link: '/claims.html',
     }));
 
-  // Email is best-effort and only when SMTP is configured; the in-app
+  // Email is best-effort and only when outbound mail is configured; the in-app
   // notification above is always the reliable channel.
   sendMailIfConfigured({
     to: payload.holder.email,
@@ -3244,14 +3274,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // Say plainly whether email will work, and exactly what to fix if not.
   if (!mailer) {
     console.log('  ⓘ Email off — claim alerts are in-app only.');
-    console.log('    To enable: set RESEND_API_KEY and MAIL_FROM in .env, or SMTP_* for a direct mail server (see .env.example).');
+    console.log('    To enable: set MAILERSEND_API_KEY and MAIL_FROM in .env (see .env.example).');
   } else {
     verifyMailer().then(status => {
       if (status.verified) {
         console.log(`  ✓ Email ready via ${MAIL_TRANSPORT}`);
       } else {
         console.log(`  ⚠ Email configured (${MAIL_TRANSPORT}) but it was rejected: ${status.error}`);
-        console.log('    Alerts will still arrive in-app. Check the API key or SMTP credentials.');
+        console.log('    Alerts will still arrive in-app. Check MAILERSEND_API_KEY and that MAIL_FROM uses a domain authenticated in MailerSend.');
       }
     });
   }

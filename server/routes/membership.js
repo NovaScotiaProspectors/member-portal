@@ -28,7 +28,7 @@ function registerMembershipRoutes(app, ctx) {
   app.post('/api/student-verification/send', requireAuth, async (req, res) => {
     try {
       if (!mailer) {
-        return res.status(503).json({ error: 'Student email verification needs SMTP configured first.' });
+        return res.status(503).json({ error: 'Student email verification needs outbound email configured first (MAILERSEND_API_KEY).' });
       }
 
       const schoolEmail = normalizeEmail(req.body.schoolEmail);

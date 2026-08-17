@@ -5,7 +5,8 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "migrate:supabase": "node scripts/migrate-to-supabase.js"
+    "migrate:supabase": "node scripts/migrate-to-supabase.js",
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "archiver": "^8.0.0",
@@ -14,8 +15,7 @@
     "cookie-parser": "^1.4.7",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
-    "multer": "^2.2.0",
-    "nodemailer": "^9.0.3"
+    "multer": "^2.2.0"
   },
   "engines": {
     "node": ">=22 <23"

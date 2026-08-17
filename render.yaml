@@ -44,15 +44,8 @@ services:
         sync: false
       - key: WIX_MEMBER_LOGIN_URL
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
+      # Outbound email. Both are required for mail to be sent; see .env.example.
+      - key: MAILERSEND_API_KEY
         sync: false
       - key: MAIL_FROM
         sync: false
