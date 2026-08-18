@@ -83,9 +83,16 @@ async function writeFileAtomic(target, contents) {
 // ── Auth / payments config (put secrets in .env) ──────────────────────────
 const SESSION_SECRET         = process.env.SESSION_SECRET         || 'test-session';
 
-/* Validate production security and URL configuration during startup. */
+/* Validate production security and URL configuration during startup.
+ *
+ * Only things that make the site unsafe or plainly broken are fatal. An
+ * optional integration that is not configured yet degrades — it must never
+ * take the whole portal offline, because that turns "automatic activation is
+ * not set up" into "nobody can reach the site at all". */
 if (IS_PRODUCTION) {
   const problems = [];
+  const warnings = [];
+
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'test-session') {
     problems.push('SESSION_SECRET must be set to a long random value (sessions can be forged without it)');
   }
@@ -95,14 +102,23 @@ if (IS_PRODUCTION) {
   if (DATA_DRIVER === 'supabase' && !supabase.isConfigured()) {
     problems.push('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set when DATA_DRIVER=supabase');
   }
+
+  // Zeffy: without these, checkout links still work and payments are activated
+  // by an admin from /admin.html — the documented fallback.
   if ((process.env.ZEFFY_STUDENT_URL || process.env.ZEFFY_REGULAR_URL) && !process.env.ZEFFY_API_KEY) {
-    problems.push('ZEFFY_API_KEY is required for automatic payment activation');
+    warnings.push('ZEFFY_API_KEY is not set — payments will not activate automatically');
   }
   if (process.env.ZEFFY_STUDENT_URL && !process.env.ZEFFY_STUDENT_CAMPAIGN_ID) {
-    problems.push('ZEFFY_STUDENT_CAMPAIGN_ID is required when student payment is enabled');
+    warnings.push('ZEFFY_STUDENT_CAMPAIGN_ID is not set — student payments cannot be matched automatically');
   }
   if (process.env.ZEFFY_REGULAR_URL && !process.env.ZEFFY_REGULAR_CAMPAIGN_ID) {
-    problems.push('ZEFFY_REGULAR_CAMPAIGN_ID is required when regular payment is enabled');
+    warnings.push('ZEFFY_REGULAR_CAMPAIGN_ID is not set — regular payments cannot be matched automatically');
+  }
+
+  if (warnings.length) {
+    console.warn('Starting with reduced functionality:');
+    warnings.forEach(w => console.warn(`  ⚠ ${w}`));
+    console.warn('  Members who pay must be activated by an admin in /admin.html until this is configured.');
   }
   if (problems.length) {
     console.error('Refusing to start in production:');
@@ -1512,6 +1528,40 @@ function supabaseMemberToUser(member) {
   };
 }
 
+// Wix account linking was added after the original members table. Keep email
+// sign-up working on older deployments by treating this as an optional mirror
+// until the Supabase migration adds members.wix_member_id.
+let supabaseHasWixMemberIdColumn = true;
+
+function missingWixMemberIdColumn(error) {
+  const message = String(error && error.message || '').toLowerCase();
+  return message.includes('wix_member_id') && (
+    message.includes('does not exist') ||
+    message.includes('schema cache')
+  );
+}
+
+function withoutWixMemberIdColumn(row) {
+  const copy = { ...row };
+  delete copy.wix_member_id;
+  return copy;
+}
+
+async function writeSupabaseMember(write, row) {
+  if (!supabaseHasWixMemberIdColumn) {
+    return write(withoutWixMemberIdColumn(row));
+  }
+
+  try {
+    return await write(row);
+  } catch (error) {
+    if (!missingWixMemberIdColumn(error)) throw error;
+    supabaseHasWixMemberIdColumn = false;
+    console.warn('Supabase members.wix_member_id is not migrated; Wix linking will use email matching.');
+    return write(withoutWixMemberIdColumn(row));
+  }
+}
+
 async function findUserByEmailSupabase(email) {
   const lower = String(email || '').toLowerCase();
   const rows = await supabase.select('members', `${supabase.eq('email_lc', lower)}&limit=1`);
@@ -1522,8 +1572,16 @@ async function findUserByWixMemberId(wixMemberId) {
   const id = String(wixMemberId || '').trim();
   if (!id) return null;
   if (USE_SUPABASE) {
-    const rows = await supabase.select('members', `${supabase.eq('wix_member_id', id)}&limit=1`);
-    return supabaseMemberToUser(rows[0]);
+    if (!supabaseHasWixMemberIdColumn) return null;
+    try {
+      const rows = await supabase.select('members', `${supabase.eq('wix_member_id', id)}&limit=1`);
+      return supabaseMemberToUser(rows[0]);
+    } catch (error) {
+      if (!missingWixMemberIdColumn(error)) throw error;
+      supabaseHasWixMemberIdColumn = false;
+      console.warn('Supabase members.wix_member_id is not migrated; Wix linking will use email matching.');
+      return null;
+    }
   }
   const { ws } = await getUsersSheet();
   let email = '';
@@ -1547,7 +1605,7 @@ async function doAppendUser(user) {
       throw err;
     }
     const memberId = await nextSupabaseMemberId();
-    await supabase.insert('members', {
+    await writeSupabaseMember(row => supabase.insert('members', row), {
       member_id: memberId,
       created_at: new Date().toISOString(),
       first_name: user.firstName,
@@ -3304,7 +3362,10 @@ async function doUpdateMembership(email, updates) {
     if (updates.wixMemberId !== undefined) patch.wix_member_id = updates.wixMemberId;
 
     const lower = String(email).toLowerCase();
-    const updated = await supabase.update('members', supabase.eq('email_lc', lower), patch);
+    const updated = await writeSupabaseMember(
+      row => supabase.update('members', supabase.eq('email_lc', lower), row),
+      patch
+    );
     invalidateSessionUser(lower);
     invalidateMemberStates();
     return !!(updated && updated.length);
