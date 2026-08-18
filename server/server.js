@@ -2815,6 +2815,8 @@ async function notifyAdjacentHolders(submission) {
 
 registerProfileRoutes(app, {
   uploadsDir: UPLOADS_DIR,
+  useSupabase: USE_SUPABASE,
+  supabase,
   requireAuth,
   requireMemberApi,
   publicMember,

@@ -100,8 +100,7 @@ function objectUrl(objectPath) {
     .join('/')}`;
 }
 
-async function uploadFile(objectPath, filePath, contentType = 'application/octet-stream') {
-  const data = await fs.readFile(filePath);
+async function uploadObject(objectPath, data, contentType = 'application/octet-stream') {
   return request(objectUrl(objectPath), {
     method: 'POST',
     headers: headers({
@@ -110,6 +109,11 @@ async function uploadFile(objectPath, filePath, contentType = 'application/octet
     }),
     body: data,
   });
+}
+
+async function uploadFile(objectPath, filePath, contentType = 'application/octet-stream') {
+  const data = await fs.readFile(filePath);
+  return uploadObject(objectPath, data, contentType);
 }
 
 async function downloadObject(objectPath) {
@@ -140,6 +144,7 @@ module.exports = {
   insert,
   update,
   remove,
+  uploadObject,
   uploadFile,
   downloadObject,
   deleteObject,

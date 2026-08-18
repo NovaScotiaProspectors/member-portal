@@ -9,6 +9,8 @@ const AVATAR_TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png' };
 function registerProfileRoutes(app, ctx) {
   const {
     uploadsDir,
+    useSupabase,
+    supabase,
     requireAuth,
     requireMemberApi,
     publicMember,
@@ -32,6 +34,46 @@ function registerProfileRoutes(app, ctx) {
     storage: multer.memoryStorage(),
     limits: { fileSize: AVATAR_MAX_SIZE, files: 1 },
   });
+
+  const avatarObjectPath = stored => `avatars/${path.basename(stored)}`;
+
+  async function storeAvatar(stored, data, contentType) {
+    if (useSupabase) {
+      await supabase.uploadObject(avatarObjectPath(stored), data, contentType);
+      return;
+    }
+    await fs.mkdir(avatarsDir, { recursive: true });
+    await fs.writeFile(path.join(avatarsDir, path.basename(stored)), data);
+  }
+
+  async function removeAvatar(stored) {
+    if (!stored) return;
+    const fileName = path.basename(stored);
+    if (useSupabase) {
+      await supabase.deleteObject(avatarObjectPath(fileName)).catch(error => {
+        console.warn('avatar storage delete:', error.message);
+      });
+    }
+    await fs.unlink(path.join(avatarsDir, fileName)).catch(() => {});
+  }
+
+  async function loadAvatar(stored) {
+    const fileName = path.basename(stored);
+    if (useSupabase) {
+      try {
+        return await supabase.downloadObject(avatarObjectPath(fileName));
+      } catch (storageError) {
+        // Preserve access to avatars created before Supabase Storage was used,
+        // when a persistent local data disk is still attached.
+        try {
+          return await fs.readFile(path.join(avatarsDir, fileName));
+        } catch {
+          throw storageError;
+        }
+      }
+    }
+    return fs.readFile(path.join(avatarsDir, fileName));
+  }
 
   app.get('/api/profile', requireAuth, async (req, res) => {
     res.json({
@@ -80,15 +122,19 @@ function registerProfileRoutes(app, ctx) {
         }
 
         const stored = `${req.user.memberId}__${crypto.randomBytes(6).toString('hex')}${ext}`;
-        await fs.mkdir(avatarsDir, { recursive: true });
-        await fs.writeFile(path.join(avatarsDir, stored), req.file.buffer);
+        await storeAvatar(stored, req.file.buffer, req.file.mimetype);
 
         const previous = req.user.profile && req.user.profile.avatar;
-        const profile = parseProfile(req.user.profile);
-        profile.avatar = stored;
-        await updateMembership(req.user.email, { profile: JSON.stringify(profile) });
-        invalidateSessionUser(req.user.email);
-        if (previous) fs.unlink(path.join(avatarsDir, path.basename(previous))).catch(() => {});
+        try {
+          const profile = parseProfile(req.user.profile);
+          profile.avatar = stored;
+          await updateMembership(req.user.email, { profile: JSON.stringify(profile) });
+          invalidateSessionUser(req.user.email);
+        } catch (error) {
+          await removeAvatar(stored);
+          throw error;
+        }
+        await removeAvatar(previous);
 
         res.json({ ok: true });
       } catch (error) {
@@ -105,7 +151,7 @@ function registerProfileRoutes(app, ctx) {
       profile.avatar = '';
       await updateMembership(req.user.email, { profile: JSON.stringify(profile) });
       invalidateSessionUser(req.user.email);
-      if (previous) fs.unlink(path.join(avatarsDir, path.basename(previous))).catch(() => {});
+      await removeAvatar(previous);
       res.json({ ok: true });
     } catch (error) {
       console.error('avatar remove:', error.message);
@@ -122,14 +168,16 @@ function registerProfileRoutes(app, ctx) {
 
       const fileName = path.basename(stored);
       const type = fileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const data = await loadAvatar(fileName);
       res.type(type);
       res.setHeader('Content-Disposition', 'inline');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Cache-Control', 'private, max-age=300');
-      res.sendFile(path.join(avatarsDir, fileName), errSend => {
-        if (errSend && !res.headersSent) res.status(404).json({ error: 'No profile picture.' });
-      });
+      res.send(data);
     } catch (error) {
+      if (error.code === 'ENOENT' || /storage 404/i.test(error.message)) {
+        return res.status(404).json({ error: 'No profile picture.' });
+      }
       console.error('avatar serve:', error.message);
       res.status(500).json({ error: 'Could not load the picture.' });
     }
