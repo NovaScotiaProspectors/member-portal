@@ -487,7 +487,8 @@ if (location.pathname === '/dashboard.html') {
         function membershipBadge(m) {
           if (m.isMember) return '<span class="status-badge status-approved">Active member</span>';
           if (m.membershipStatus === 'inactive') return '<span class="status-badge status-pending">Membership lapsed</span>';
-          return '<span class="status-badge status-none">Registered</span>';
+          if (m.membershipStatus === 'pending_payment') return '<span class="status-badge status-pending">Awaiting payment</span>';
+          return '<span class="status-badge status-pending">Awaiting payment</span>';
         }
     
         function renderAccount(me) {

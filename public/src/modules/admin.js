@@ -38,9 +38,10 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
     }
 
     function statusBadge(status) {
-      const s = status || 'none';
-      const label = s === 'active' ? 'Member' : s === 'inactive' ? 'Lapsed' : 'Registered';
-      return `<span class="status-badge status-${esc(s)}">${label}</span>`;
+      const s = status || 'pending_payment';
+      const label = s === 'active' ? 'Member' : s === 'inactive' ? 'Lapsed' : 'Awaiting payment';
+      const cssStatus = s === 'pending_payment' ? 'pending' : s;
+      return `<span class="status-badge status-${esc(cssStatus)}">${label}</span>`;
     }
 
     function projectStatusSelect(p) {
@@ -213,7 +214,7 @@ const { esc, api, showToast, fmtDateTime } = NSPA;
       const users = allMembers.filter(u => {
         const haystack = [u.memberId, u.firstName, u.lastName, u.email, u.phone].join(' ').toLowerCase();
         return (!q || haystack.includes(q)) &&
-          (!membership || (u.membershipStatus || 'none') === membership) &&
+          (!membership || (u.membershipStatus || 'pending_payment') === membership) &&
           (!network || (u.networkStatus || 'out') === network);
       });
       if (!users.length) {

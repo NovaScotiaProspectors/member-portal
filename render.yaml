@@ -40,9 +40,19 @@ services:
         sync: false
       - key: ZEFFY_REGULAR_URL
         sync: false
+      - key: ZEFFY_API_KEY
+        sync: false
+      - key: ZEFFY_STUDENT_CAMPAIGN_ID
+        sync: false
+      - key: ZEFFY_REGULAR_CAMPAIGN_ID
+        sync: false
       - key: WIX_SITE_URL
         sync: false
       - key: WIX_MEMBER_LOGIN_URL
+        sync: false
+      - key: WIX_CLIENT_ID
+        sync: false
+      - key: WIX_OAUTH_REDIRECT_URI
         sync: false
       # Outbound email. Both are required for mail to be sent; see .env.example.
       - key: MAILERSEND_API_KEY

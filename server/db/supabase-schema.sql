@@ -11,14 +11,20 @@ create table if not exists members (
   password_hash text not null,
   payment_customer_id text not null default '',
   subscription_id text not null default '',
-  membership_status text not null default 'none',
+  membership_status text not null default 'pending_payment',
   member_since timestamptz,
   account_status text not null default 'active',
   membership_expiry timestamptz,
   network_status text not null default 'out',
   network_visibility jsonb not null default '{"email":true,"phone":false,"projects":true,"tenures":true,"commodities":true}',
-  profile jsonb not null default '{"bio":"","company":"","role":"","location":"","avatar":"","socials":{"website":"","linkedin":"","facebook":"","x":""},"expertise":[]}'
+  profile jsonb not null default '{"bio":"","company":"","role":"","location":"","avatar":"","socials":{"website":"","linkedin":"","facebook":"","x":""},"expertise":[]}',
+  wix_member_id text
 );
+
+alter table members add column if not exists wix_member_id text;
+create unique index if not exists members_wix_member_idx
+  on members (wix_member_id) where wix_member_id is not null;
+update members set membership_status = 'pending_payment' where membership_status = 'none';
 
 create index if not exists members_membership_idx on members (membership_status, account_status);
 create index if not exists members_network_idx on members (network_status);

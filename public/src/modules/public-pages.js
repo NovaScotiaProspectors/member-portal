@@ -10,22 +10,33 @@ if (location.pathname === '/signup.html') {
     
         // Where to go after signing in. A guarded page that bounced the user here
         // passes itself as ?next=… so they land back where they were headed.
-        function nextUrl() {
+        // Where to send someone once they are signed in. A guarded page passes
+        // itself as ?next=…; otherwise it depends on what they can actually
+        // reach — the project form is members-only, so sending a brand-new
+        // pending-payment account there just bounces them to /membership.html.
+        function nextUrl(member) {
           const next = new URLSearchParams(location.search).get('next');
           // Same-origin paths only — never follow an absolute URL from the query.
-          return next && next.startsWith('/') && !next.startsWith('//') ? next : '/index.html';
+          if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+          return member && member.isMember ? '/index.html' : '/membership.html';
         }
     
         function openProjectForm(member) {
           NSPA.cacheMember(member);
-          window.location.href = nextUrl();
+          window.location.href = nextUrl(member);
         }
     
         // Already signed in (e.g. opened this page in a new tab)? Skip the form.
         NSPA.getSession().then(me => {
+          const wixButton = document.getElementById('wix-signin-btn');
+          if (wixButton && me.wixSsoEnabled) {
+            const next = new URLSearchParams(location.search).get('next');
+            wixButton.href = `/api/auth/wix${next ? `?next=${encodeURIComponent(next)}` : ''}`;
+            wixButton.hidden = false;
+          }
           if (me.authenticated && me.member) {
             showToast(`You're already signed in as ${me.member.firstName || me.member.email}.`, 'success');
-            setTimeout(() => { window.location.href = nextUrl(); }, 600);
+            setTimeout(() => { window.location.href = nextUrl(me.member); }, 600);
           }
         });
     
@@ -68,7 +79,7 @@ if (location.pathname === '/signup.html') {
             showToast(
               data.restored
                 ? `Welcome back, ${firstName}! Your account and member ID have been restored.`
-                : `Welcome, ${firstName}! Opening your account.`,
+                : `Welcome, ${firstName}! Choose your membership to continue.`,
               'success'
             );
             setTimeout(() => openProjectForm(data.member || { firstName, lastName, email, phone }), 700);
@@ -215,7 +226,7 @@ if (location.pathname === '/membership.html') {
               <li>Membership runs until 31 December ${expiryYear}</li>
               ${julyBonus ? `<li><strong>New-member bonus:</strong> join on or after 1 July and the rest of ${now.getFullYear()} is included at no extra cost — your payment covers the ${expiryYear} membership year</li>` : ''}
             </ul>
-            ${me.paymentsEnabled ? '<p class="form-hint">Payment opens in Zeffy. NSPA can activate your member access after payment is received.</p>' : '<p class="form-hint">Zeffy checkout links are not configured yet. Add ZEFFY_STUDENT_URL and ZEFFY_REGULAR_URL in .env.</p>'}
+            ${me.paymentsEnabled ? '<p class="form-hint">Payment opens in Zeffy. Your access is activated automatically after Zeffy verifies the payment. Use the same email as your portal account.</p>' : '<p class="form-hint">Zeffy automatic checkout is not configured yet. Add the checkout URLs, API key, campaign IDs, and webhook described in .env.example.</p>'}
             <p class="auth-footer"><a href="#" id="logoutLink">Log out</a></p>`;
     
           document.querySelectorAll('.membership-plan-btn').forEach(btn => {

@@ -25,6 +25,7 @@ function registerAdminRoutes(app, ctx) {
     projectStatuses,
     zeffyStudentUrl,
     zeffyRegularUrl,
+    zeffyConfigured,
     getMailStatus,
     portal,
     activateMembership,
@@ -87,7 +88,7 @@ function registerAdminRoutes(app, ctx) {
       res.json({
         members: { total: users.length, active: activeMembers, network: networkMembers },
         projects: { total: projects.length, archived: archivedProjects, statuses: statusCounts },
-        paymentsEnabled: !!(zeffyStudentUrl && zeffyRegularUrl),
+        paymentsEnabled: !!(zeffyStudentUrl && zeffyRegularUrl && zeffyConfigured),
         mail: getMailStatus(),
         claimWatch: await portal.getSetting('lastClaimWatch', null),
         eventsArchiveEnabled: !!(await portal.getSetting('eventsArchiveEnabled', false)),
@@ -109,9 +110,9 @@ function registerAdminRoutes(app, ctx) {
       if (action === 'activate') {
         await activateMembership(user.email, '', '');
       } else if (action === 'lapse') {
-        await updateMembership(user.email, { membershipStatus: 'inactive', membershipExpiry: '', subscriptionId: '' });
+        await updateMembership(user.email, { membershipStatus: 'inactive', membershipExpiry: '' });
       } else if (action === 'deactivate') {
-        await updateMembership(user.email, { accountStatus: 'deactivated', membershipStatus: 'inactive', subscriptionId: '', networkStatus: 'out' });
+        await updateMembership(user.email, { accountStatus: 'deactivated', membershipStatus: 'inactive', networkStatus: 'out' });
       } else if (action === 'restore') {
         await updateMembership(user.email, { accountStatus: 'active' });
       } else {

@@ -22,8 +22,12 @@ const { registerOptionRoutes } = require('./routes/options');
 const { registerProfileRoutes } = require('./routes/profile');
 const { registerMembershipRoutes } = require('./routes/membership');
 const { registerAdminRoutes } = require('./routes/admin');
+const { registerIntegrationRoutes } = require('./routes/integrations');
+const { createZeffyService } = require('./services/zeffy');
+const { createWixAuth } = require('./services/wixAuth');
 const { clampInt } = require('./utils/numbers');
 const { parseDataRoomUrl, planProjectEdit } = require('./projectEdits');
+const { nextQuery } = require('./utils/nextPath');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -91,6 +95,15 @@ if (IS_PRODUCTION) {
   if (DATA_DRIVER === 'supabase' && !supabase.isConfigured()) {
     problems.push('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set when DATA_DRIVER=supabase');
   }
+  if ((process.env.ZEFFY_STUDENT_URL || process.env.ZEFFY_REGULAR_URL) && !process.env.ZEFFY_API_KEY) {
+    problems.push('ZEFFY_API_KEY is required for automatic payment activation');
+  }
+  if (process.env.ZEFFY_STUDENT_URL && !process.env.ZEFFY_STUDENT_CAMPAIGN_ID) {
+    problems.push('ZEFFY_STUDENT_CAMPAIGN_ID is required when student payment is enabled');
+  }
+  if (process.env.ZEFFY_REGULAR_URL && !process.env.ZEFFY_REGULAR_CAMPAIGN_ID) {
+    problems.push('ZEFFY_REGULAR_CAMPAIGN_ID is required when regular payment is enabled');
+  }
   if (problems.length) {
     console.error('Refusing to start in production:');
     problems.forEach(p => console.error(`  • ${p}`));
@@ -100,8 +113,13 @@ if (IS_PRODUCTION) {
 const ZEFFY_STUDENT_URL      = process.env.ZEFFY_STUDENT_URL      || '';
 const ZEFFY_REGULAR_URL      = process.env.ZEFFY_REGULAR_URL      || '';
 const APP_BASE_URL           = process.env.APP_BASE_URL           || `http://localhost:${PORT}`;
+const ZEFFY_API_KEY          = process.env.ZEFFY_API_KEY          || '';
+const ZEFFY_STUDENT_CAMPAIGN_ID = process.env.ZEFFY_STUDENT_CAMPAIGN_ID || '';
+const ZEFFY_REGULAR_CAMPAIGN_ID = process.env.ZEFFY_REGULAR_CAMPAIGN_ID || '';
 const WIX_SITE_URL           = process.env.WIX_SITE_URL           || '';
 const WIX_MEMBER_LOGIN_URL   = process.env.WIX_MEMBER_LOGIN_URL   || '';
+const WIX_CLIENT_ID          = process.env.WIX_CLIENT_ID          || '';
+const WIX_OAUTH_REDIRECT_URI = process.env.WIX_OAUTH_REDIRECT_URI || `${APP_BASE_URL}/api/auth/wix/callback`;
 const OPENAI_API_KEY         = process.env.OPENAI_API_KEY         || '';
 const OPENAI_MODEL           = process.env.OPENAI_MODEL           || 'gpt-5.6-luna';
 const STUDENT_EMAIL_DOMAINS  = (process.env.STUDENT_EMAIL_DOMAINS || '')
@@ -110,6 +128,11 @@ const STUDENT_EMAIL_DOMAINS  = (process.env.STUDENT_EMAIL_DOMAINS || '')
   .filter(Boolean);
 // Comma-separated staff emails allowed into the admin view.
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+const zeffy = createZeffyService({
+  apiKey: ZEFFY_API_KEY,
+  campaigns: { student: ZEFFY_STUDENT_CAMPAIGN_ID, regular: ZEFFY_REGULAR_CAMPAIGN_ID },
+});
+const wixAuth = createWixAuth({ clientId: WIX_CLIENT_ID, redirectUri: WIX_OAUTH_REDIRECT_URI });
 
 /* Behind a hosting proxy, TLS is terminated at the edge and the app is spoken
    to over plain HTTP. Trusting the first hop makes req.secure and req.ip
@@ -1133,7 +1156,7 @@ const USERS_XLSX = path.join(DATA_DIR, 'users.xlsx');
 const USER_HEADERS = [
   'Member ID', 'Timestamp', 'First Name', 'Last Name', 'Email', 'Phone', 'Password Hash',
   'Payment Customer ID', 'Payment Reference ID', 'Membership Status', 'Member Since', 'Account Status',
-  'Membership Expiry', 'Network Status', 'Network Visibility', 'Profile',
+  'Membership Expiry', 'Network Status', 'Network Visibility', 'Profile', 'Wix Member ID',
 ];
 const MEMBER_ID_COL = 1;
 const EMAIL_COL = 5;
@@ -1147,6 +1170,7 @@ const MEMBERSHIP_EXPIRY_COL = 13;
 const NETWORK_STATUS_COL = 14;
 const NETWORK_VISIBILITY_COL = 15;
 const PROFILE_COL = 16;
+const WIX_MEMBER_ID_COL = 17;
 
 const DEFAULT_NETWORK_VISIBILITY = {
   email: true,
@@ -1333,6 +1357,9 @@ function ensureUserSheetSchema(ws) {
     if (!cellText(row.getCell(ACCOUNT_STATUS_COL))) {
       row.getCell(ACCOUNT_STATUS_COL).value = 'active';
     }
+    if (!cellText(row.getCell(MEMBERSHIP_STATUS_COL)) || cellText(row.getCell(MEMBERSHIP_STATUS_COL)) === 'none') {
+      row.getCell(MEMBERSHIP_STATUS_COL).value = 'pending_payment';
+    }
     // Existing active members expire on 31 December too.
     if (cellText(row.getCell(MEMBERSHIP_STATUS_COL)) === 'active' && !cellText(row.getCell(MEMBERSHIP_EXPIRY_COL))) {
       row.getCell(MEMBERSHIP_EXPIRY_COL).value = membershipExpiryDate();
@@ -1356,6 +1383,7 @@ function ensureUserSheetSchema(ws) {
     { key: 'networkStatus', width: 18 },
     { key: 'networkVisibility', width: 44 },
     { key: 'profile', width: 60 },
+    { key: 'wixMemberId', width: 38 },
   ];
 }
 
@@ -1403,13 +1431,14 @@ async function findUserByEmail(email) {
       passwordHash: cellText(row.getCell(PASSWORD_HASH_COL)),
       paymentCustomerId: cellText(row.getCell(PAYMENT_CUSTOMER_COL)),
       subscriptionId: cellText(row.getCell(SUBSCRIPTION_COL)),
-      membershipStatus: cellText(row.getCell(MEMBERSHIP_STATUS_COL)) || 'none',
+      membershipStatus: cellText(row.getCell(MEMBERSHIP_STATUS_COL)) || 'pending_payment',
       memberSince: cellText(row.getCell(MEMBER_SINCE_COL)),
       accountStatus: cellText(row.getCell(ACCOUNT_STATUS_COL)) || 'active',
       membershipExpiry: cellText(row.getCell(MEMBERSHIP_EXPIRY_COL)),
       networkStatus: cellText(row.getCell(NETWORK_STATUS_COL)) || 'out',
       networkVisibility: parseNetworkVisibility(cellText(row.getCell(NETWORK_VISIBILITY_COL))),
       profile: parseProfile(cellText(row.getCell(PROFILE_COL))),
+      wixMemberId: cellText(row.getCell(WIX_MEMBER_ID_COL)),
     };
   });
 
@@ -1428,13 +1457,14 @@ function supabaseMemberToUser(member) {
     passwordHash: member.password_hash || '',
     paymentCustomerId: member.payment_customer_id || '',
     subscriptionId: member.subscription_id || '',
-    membershipStatus: member.membership_status || 'none',
+    membershipStatus: member.membership_status || 'pending_payment',
     memberSince: member.member_since || '',
     accountStatus: member.account_status || 'active',
     membershipExpiry: member.membership_expiry || '',
     networkStatus: member.network_status || 'out',
     networkVisibility: parseNetworkVisibility(member.network_visibility),
     profile: parseProfile(member.profile),
+    wixMemberId: member.wix_member_id || '',
   };
 }
 
@@ -1442,6 +1472,21 @@ async function findUserByEmailSupabase(email) {
   const lower = String(email || '').toLowerCase();
   const rows = await supabase.select('members', `${supabase.eq('email_lc', lower)}&limit=1`);
   return supabaseMemberToUser(rows[0]);
+}
+
+async function findUserByWixMemberId(wixMemberId) {
+  const id = String(wixMemberId || '').trim();
+  if (!id) return null;
+  if (USE_SUPABASE) {
+    const rows = await supabase.select('members', `${supabase.eq('wix_member_id', id)}&limit=1`);
+    return supabaseMemberToUser(rows[0]);
+  }
+  const { ws } = await getUsersSheet();
+  let email = '';
+  ws.eachRow((row, n) => {
+    if (n > 1 && !email && cellText(row.getCell(WIX_MEMBER_ID_COL)) === id) email = cellText(row.getCell(EMAIL_COL));
+  });
+  return email ? findUserByEmail(email) : null;
 }
 
 async function nextSupabaseMemberId() {
@@ -1469,13 +1514,14 @@ async function doAppendUser(user) {
       password_hash: hashPassword(user.password),
       payment_customer_id: '',
       subscription_id: '',
-      membership_status: 'none',
+      membership_status: 'pending_payment',
       member_since: null,
       account_status: 'active',
       membership_expiry: null,
       network_status: 'out',
       network_visibility: cleanNetworkVisibility(DEFAULT_NETWORK_VISIBILITY),
       profile: parseProfile(DEFAULT_PROFILE),
+      wix_member_id: user.wixMemberId ? String(user.wixMemberId) : null,
     });
     invalidateMemberStates();
     return memberId;
@@ -1499,13 +1545,14 @@ async function doAppendUser(user) {
     hashPassword(user.password),
     '',        // Payment Customer ID
     '',        // Payment Reference ID
-    'none',    // Membership Status
+    'pending_payment', // Membership Status
     '',        // Member Since
     'active',  // Account Status
     '',        // Membership Expiry
     'out',     // Network Status
     serializeNetworkVisibility(DEFAULT_NETWORK_VISIBILITY),
     serializeProfile(DEFAULT_PROFILE),
+    String(user.wixMemberId || ''),
   ]);
   await fs.mkdir(path.dirname(USERS_XLSX), { recursive: true });
   await writeWorkbookAtomic(wb, USERS_XLSX);
@@ -1522,6 +1569,7 @@ function appendUser(user) {
 
 registerAuthRoutes(app, {
   findUserByEmail,
+  findUserByWixMemberId,
   updateMembership,
   hashPassword,
   appendUser,
@@ -1540,6 +1588,18 @@ registerAuthRoutes(app, {
   WIX_SITE_URL,
   WIX_MEMBER_LOGIN_URL,
   APP_BASE_URL,
+  wixAuth,
+  zeffy,
+  secureCookies: IS_PRODUCTION,
+});
+
+registerIntegrationRoutes(app, {
+  zeffy,
+  findUserByEmail,
+  activateMembership,
+  invalidateSessionUser,
+  studentVerificationOk,
+  portal,
 });
 
 
@@ -1635,7 +1695,16 @@ function requireMemberOrAdminApi(req, res, next) {
 }
 
 function requireMemberPage(req, res, next) {
-  if (!req.user) return res.redirect(WIX_MEMBER_LOGIN_URL || '/signup.html');
+  if (!req.user) {
+    // Carry the destination across sign-in, so someone following a claim-alert
+    // email or a link from the public site lands where they were headed rather
+    // than on a default page with no memory of the journey.
+    if (wixAuth.configured) return res.redirect(`/api/auth/wix${nextQuery(req.originalUrl)}`);
+    if (WIX_MEMBER_LOGIN_URL) return res.redirect(WIX_MEMBER_LOGIN_URL);
+    return res.redirect(`/signup.html${nextQuery(req.originalUrl)}`);
+  }
+  // A signed-in account awaiting payment is not sent onward: it cannot reach the page until
+  // their membership is active, so the destination is not worth carrying.
   if (!isActiveMember(req.user)) return res.redirect('/membership.html');
   next();
 }
@@ -1649,7 +1718,7 @@ async function publicMember(user) {
     lastName: user.lastName,
     email: user.email,
     phone: user.phone,
-    membershipStatus: user.membershipStatus || 'none',
+    membershipStatus: user.membershipStatus || 'pending_payment',
     isMember: isActiveMember(user),
     memberSince: user.memberSince || null,
     membershipExpiry: user.membershipExpiry || null,
@@ -3092,7 +3161,11 @@ function requireAdminApi(req, res, next) {
 }
 
 function requireAdminPage(req, res, next) {
-  if (!req.user) return res.redirect(WIX_MEMBER_LOGIN_URL || '/signup.html');
+  if (!req.user) {
+    if (wixAuth.configured) return res.redirect(`/api/auth/wix${nextQuery(req.originalUrl)}`);
+    if (WIX_MEMBER_LOGIN_URL) return res.redirect(WIX_MEMBER_LOGIN_URL);
+    return res.redirect(`/signup.html${nextQuery(req.originalUrl)}`);
+  }
   if (!isAdmin(req.user)) return res.redirect('/membership.html');
   next();
 }
@@ -3123,7 +3196,7 @@ async function listUsers() {
       lastName: cellText(row.getCell(4)),
       email,
       phone: cellText(row.getCell(6)),
-      membershipStatus: cellText(row.getCell(MEMBERSHIP_STATUS_COL)) || 'none',
+      membershipStatus: cellText(row.getCell(MEMBERSHIP_STATUS_COL)) || 'pending_payment',
       memberSince: cellText(row.getCell(MEMBER_SINCE_COL)),
       accountStatus: cellText(row.getCell(ACCOUNT_STATUS_COL)) || 'active',
       membershipExpiry: cellText(row.getCell(MEMBERSHIP_EXPIRY_COL)),
@@ -3151,6 +3224,7 @@ registerAdminRoutes(app, {
   projectStatuses: PROJECT_STATUSES,
   zeffyStudentUrl: ZEFFY_STUDENT_URL,
   zeffyRegularUrl: ZEFFY_REGULAR_URL,
+  zeffyConfigured: zeffy.configured,
   getMailStatus: () => mailStatus,
   portal,
   activateMembership,
@@ -3175,6 +3249,7 @@ async function doUpdateMembership(email, updates) {
     if (updates.networkStatus !== undefined) patch.network_status = updates.networkStatus;
     if (updates.networkVisibility !== undefined) patch.network_visibility = parseNetworkVisibility(updates.networkVisibility);
     if (updates.profile !== undefined) patch.profile = parseProfile(updates.profile);
+    if (updates.wixMemberId !== undefined) patch.wix_member_id = updates.wixMemberId;
 
     const lower = String(email).toLowerCase();
     const updated = await supabase.update('members', supabase.eq('email_lc', lower), patch);
@@ -3202,6 +3277,7 @@ async function doUpdateMembership(email, updates) {
     if (updates.networkStatus !== undefined)    row.getCell(NETWORK_STATUS_COL).value = updates.networkStatus;
     if (updates.networkVisibility !== undefined) row.getCell(NETWORK_VISIBILITY_COL).value = updates.networkVisibility;
     if (updates.profile !== undefined)          row.getCell(PROFILE_COL).value = updates.profile; // serialized JSON
+    if (updates.wixMemberId !== undefined)      row.getCell(WIX_MEMBER_ID_COL).value = updates.wixMemberId;
     updated = true;
   });
   if (updated) await writeWorkbookAtomic(wb, USERS_XLSX);
@@ -3219,16 +3295,21 @@ function updateMembership(email, updates) {
 }
 
 async function activateMembership(email, paymentCustomerId, paymentReferenceId) {
-  if (!email) return;
+  if (!email) return false;
   const user = await findUserByEmail(email);
+  if (!user) return false;
+  // A payment may only ever be consumed once, even if the webhook is replayed
+  // after the membership expires or is cancelled.
+  if (paymentReferenceId && user.subscriptionId === paymentReferenceId) return true;
   // A first-time member has no memberSince yet (their member ID was only just
   // issued). The July-1 bonus applies to them, not to lapsed-member renewals.
   const newMember = !user || !user.memberSince;
-  const updates = { membershipStatus: 'active', membershipExpiry: membershipExpiryDate({ newMember }) };
+  const updates = { accountStatus: 'active', membershipStatus: 'active', membershipExpiry: membershipExpiryDate({ newMember }) };
   if (paymentCustomerId) updates.paymentCustomerId = paymentCustomerId;
   if (paymentReferenceId) updates.subscriptionId = paymentReferenceId;
   if (newMember) updates.memberSince = new Date().toISOString();
   await updateMembership(email, updates);
+  return true;
 }
 
 function normalizeEmail(value) {

@@ -17,17 +17,18 @@
     <header class="page-header auth-header">
       <p class="eyebrow">Nova Scotia Prospectors Association</p>
       <h1>Member <span>Access</span></h1>
-      <p class="subtitle">Create your account or securely return to your member workspace.</p>
+      <p class="subtitle">Sign in with Wix, or create a membership account before continuing to payment.</p>
     </header>
 
     <div class="form-card auth-card">
+      <a class="secondary-btn" id="wix-signin-btn" href="/api/auth/wix" hidden>Continue with Wix</a>
       <section class="form-section auth-panel auth-panel-primary" aria-labelledby="create-account-title">
         <div class="auth-panel-heading">
           <span class="auth-panel-index">01</span>
           <div>
             <p class="auth-panel-kicker">New member</p>
-            <h2 id="create-account-title">Create your account</h2>
-            <p>Join the NSPA member registry and start submitting projects.</p>
+            <h2 id="create-account-title">Start your membership</h2>
+            <p>Create your pending account, then choose and pay for a membership.</p>
           </div>
         </div>
 
@@ -65,7 +66,7 @@
         </div>
 
         <button class="submit-btn auth-submit" id="signup-btn" type="button">
-          Create Account
+          Continue to Membership
           <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 7.5h9M8 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>

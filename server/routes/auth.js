@@ -1,9 +1,13 @@
+const crypto = require('crypto');
+const { safeNextPath } = require('../utils/nextPath');
+
 function registerAuthRoutes(app, ctx) {
   const {
     findUserByEmail, updateMembership, hashPassword, appendUser, invalidateSessionUser,
     setSession, clearSession, verifyPassword, isActiveMember, publicMember, isAdmin, requireAuth,
     serializeNetworkVisibility, DEFAULT_NETWORK_VISIBILITY, ZEFFY_STUDENT_URL, ZEFFY_REGULAR_URL,
-    WIX_SITE_URL, WIX_MEMBER_LOGIN_URL, APP_BASE_URL,
+    WIX_SITE_URL, WIX_MEMBER_LOGIN_URL, APP_BASE_URL, wixAuth, secureCookies,
+    findUserByWixMemberId, zeffy,
   } = ctx;
 
   app.post('/api/signup', async (req, res) => {
@@ -38,7 +42,7 @@ function registerAuthRoutes(app, ctx) {
           phone,
           passwordHash: hashPassword(password),
           accountStatus: 'active',
-          membershipStatus: 'none',
+          membershipStatus: 'pending_payment',
           memberSince: '',
           networkStatus: 'out',
           networkVisibility: serializeNetworkVisibility(DEFAULT_NETWORK_VISIBILITY),
@@ -48,7 +52,7 @@ function registerAuthRoutes(app, ctx) {
         return res.status(200).json({
           ok: true,
           restored: true,
-          member: { memberId: existing.memberId, firstName, lastName, email, phone, membershipStatus: 'none', isMember: false },
+          member: { memberId: existing.memberId, firstName, lastName, email, phone, membershipStatus: 'pending_payment', isMember: false },
         });
       }
   
@@ -57,7 +61,7 @@ function registerAuthRoutes(app, ctx) {
       setSession(res, email);
       res.status(201).json({
         ok: true,
-        member: { memberId, firstName, lastName, email, phone, membershipStatus: 'none', isMember: false },
+        member: { memberId, firstName, lastName, email, phone, membershipStatus: 'pending_payment', isMember: false },
       });
     } catch (error) {
       if (error.code === 'DUP') return res.status(409).json({ error: error.message });
@@ -112,7 +116,8 @@ function registerAuthRoutes(app, ctx) {
       member: await publicMember(req.user),
       isAdmin: isAdmin(req.user),
       wixSiteUrl: WIX_SITE_URL,
-      wixMemberLoginUrl: WIX_MEMBER_LOGIN_URL,
+      wixMemberLoginUrl: req.user ? '' : (wixAuth.configured ? `${APP_BASE_URL}/api/auth/wix` : WIX_MEMBER_LOGIN_URL),
+      wixSsoEnabled: wixAuth.configured,
       appBaseUrl: APP_BASE_URL,
       publicMapUrl: `${APP_BASE_URL}/map.html`,
       eventsUrl: `${APP_BASE_URL}/events.html`,
@@ -121,7 +126,8 @@ function registerAuthRoutes(app, ctx) {
         { id: 'student', label: 'Student Member', price: 'CA$15', url: ZEFFY_STUDENT_URL },
         { id: 'regular', label: 'Regular Member', price: 'CA$35', url: ZEFFY_REGULAR_URL },
       ],
-      paymentsEnabled: !!(ZEFFY_STUDENT_URL && ZEFFY_REGULAR_URL),
+      paymentsEnabled: !!(ZEFFY_STUDENT_URL && ZEFFY_REGULAR_URL && zeffy.configured),
+      automaticPaymentActivation: zeffy.configured,
     });
   });
   
@@ -137,7 +143,7 @@ function registerAuthRoutes(app, ctx) {
       eventsUrl: `${APP_BASE_URL}/events.html`,
       memberPortalUrl: `${APP_BASE_URL}/dashboard.html`,
       projectFormUrl: `${APP_BASE_URL}/index.html`,
-      memberLoginUrl: WIX_MEMBER_LOGIN_URL || `${APP_BASE_URL}/signup.html`,
+      memberLoginUrl: wixAuth.configured ? `${APP_BASE_URL}/api/auth/wix` : (WIX_MEMBER_LOGIN_URL || `${APP_BASE_URL}/signup.html`),
       wixSiteUrl: WIX_SITE_URL,
     });
   });
@@ -146,16 +152,92 @@ function registerAuthRoutes(app, ctx) {
     clearSession(res);
     res.json({ ok: true });
   });
+
+  const wixCookieOptions = {
+    httpOnly: true,
+    signed: true,
+    sameSite: 'lax',
+    secure: secureCookies,
+    maxAge: 10 * 60 * 1000,
+  };
+
+  app.get('/api/auth/wix', async (req, res) => {
+    if (!wixAuth.configured) return res.status(503).send('Wix sign-in is not configured.');
+    try {
+      const flow = await wixAuth.begin();
+      res.cookie('nspa_wix_state', flow.state, wixCookieOptions);
+      res.cookie('nspa_wix_verifier', flow.verifier, wixCookieOptions);
+      res.cookie('nspa_wix_next', safeNextPath(req.query.next), wixCookieOptions);
+      return res.redirect(flow.url);
+    } catch (error) {
+      console.error('wix sign-in:', error);
+      return res.status(502).send('Could not start Wix sign-in.');
+    }
+  });
+
+  app.get('/api/auth/wix/callback', async (req, res) => {
+    // Read the one-time cookies, then clear them immediately — before any
+    // response is sent. Clearing afterwards (in a `finally`, say) sets headers
+    // on a request that has already been answered, which throws
+    // ERR_HTTP_HEADERS_SENT and takes the process down with it.
+    const signedCookies = req.signedCookies || {};
+    const next = safeNextPath(signedCookies.nspa_wix_next);
+    const expectedState = String(signedCookies.nspa_wix_state || '');
+    const verifier = String(signedCookies.nspa_wix_verifier || '');
+    for (const name of ['nspa_wix_state', 'nspa_wix_verifier', 'nspa_wix_next']) {
+      res.clearCookie(name, { sameSite: 'lax', secure: secureCookies });
+    }
+
+    try {
+      if (req.query.error) throw new Error(`Wix rejected sign-in: ${req.query.error}`);
+      const state = String(req.query.state || '');
+      const code = String(req.query.code || '');
+      if (!state || !expectedState || state !== expectedState || !verifier || !code) {
+        return res.status(400).send('Invalid or expired Wix sign-in.');
+      }
+
+      const identity = await wixAuth.finish({ code, verifier });
+      const linked = await findUserByWixMemberId(identity.wixMemberId);
+      if (linked && linked.email.toLowerCase() !== identity.email) {
+        return res.status(409).send('This Wix account is already linked to another portal account.');
+      }
+
+      let user = await findUserByEmail(identity.email);
+      if (user && user.wixMemberId && user.wixMemberId !== identity.wixMemberId) {
+        return res.status(409).send('This portal account is already linked to another Wix account.');
+      }
+      if (!user) {
+        await appendUser({
+          firstName: identity.firstName || identity.email.split('@')[0],
+          lastName: identity.lastName || 'Member',
+          email: identity.email,
+          phone: identity.phone,
+          password: crypto.randomBytes(48).toString('base64url'),
+          wixMemberId: identity.wixMemberId,
+        });
+        user = await findUserByEmail(identity.email);
+      } else if (!user.wixMemberId || (user.accountStatus || 'active') === 'deactivated') {
+        await updateMembership(user.email, { wixMemberId: identity.wixMemberId, accountStatus: 'active' });
+        invalidateSessionUser(user.email);
+        user = await findUserByEmail(user.email);
+      }
+
+      setSession(res, user.email);
+      return res.redirect(isActiveMember(user) ? (next || '/dashboard.html') : '/membership.html');
+    } catch (error) {
+      console.error('wix callback:', error);
+      return res.status(502).send('Could not complete Wix sign-in.');
+    }
+  });
   
   // Cancel membership but keep the account (and its member ID + project history).
-  // The member becomes a registered non-member and can re-join later.
+  // The account and history remain available for a later renewal.
   app.post('/api/membership/cancel', requireAuth, async (req, res) => {
     try {
       const user = req.user;
       await updateMembership(user.email, {
         membershipStatus: 'inactive',
         membershipExpiry: '',
-        subscriptionId: '',
       });
       invalidateSessionUser(user.email);
       res.json({ ok: true });
@@ -174,7 +256,6 @@ function registerAuthRoutes(app, ctx) {
       await updateMembership(user.email, {
         accountStatus: 'deactivated',
         membershipStatus: 'inactive',
-        subscriptionId: '',
       });
   
       invalidateSessionUser(user.email);

@@ -66,13 +66,14 @@ async function migrateMembers() {
       password_hash: text(row.getCell(7)),
       payment_customer_id: text(row.getCell(8)),
       subscription_id: text(row.getCell(9)),
-      membership_status: text(row.getCell(10)) || 'none',
+      membership_status: ['none', ''].includes(text(row.getCell(10))) ? 'pending_payment' : text(row.getCell(10)),
       member_since: text(row.getCell(11)) || null,
       account_status: text(row.getCell(12)) || 'active',
       membership_expiry: text(row.getCell(13)) || null,
       network_status: text(row.getCell(14)) || 'out',
       network_visibility: json(text(row.getCell(15)), { email: true, phone: false, projects: true, tenures: true, commodities: true }),
       profile: json(text(row.getCell(16)), {}),
+      wix_member_id: text(row.getCell(17)) || null,
     };
   });
   if (rows.length) await supabase.insert('members', rows, { upsert: true, onConflict: 'member_id' });
