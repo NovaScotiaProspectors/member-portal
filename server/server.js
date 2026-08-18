@@ -415,6 +415,41 @@ function submissionToProjectRow(submission, id = submission.id) {
   };
 }
 
+// `data_room_url` was added after the original Supabase schema. Deployments
+// that have not run the migration must still be able to save projects: the
+// canonical link also lives in project_submissions.payload, so omit only the
+// redundant projects-table column until the database schema is upgraded.
+let supabaseHasProjectDataRoomColumn = true;
+
+function missingProjectDataRoomColumn(error) {
+  const message = String(error && error.message || '').toLowerCase();
+  return message.includes('data_room_url') && (
+    message.includes('does not exist') ||
+    message.includes('schema cache')
+  );
+}
+
+function withoutProjectDataRoomColumn(row) {
+  const copy = { ...row };
+  delete copy.data_room_url;
+  return copy;
+}
+
+async function writeSupabaseProject(write, row) {
+  if (!supabaseHasProjectDataRoomColumn) {
+    return write(withoutProjectDataRoomColumn(row));
+  }
+
+  try {
+    return await write(row);
+  } catch (error) {
+    if (!missingProjectDataRoomColumn(error)) throw error;
+    supabaseHasProjectDataRoomColumn = false;
+    console.warn('Supabase projects.data_room_url is not migrated; using project submission payload storage.');
+    return write(withoutProjectDataRoomColumn(row));
+  }
+}
+
 async function nextSupabaseProjectId() {
   const rows = await supabase.select('projects', 'select=id&order=id.desc&limit=1');
   const current = rows && rows[0] && String(rows[0].id || '').match(/^PRJ-(\d+)$/i);
@@ -424,10 +459,10 @@ async function nextSupabaseProjectId() {
 
 async function appendProjectToSupabase(submission) {
   const projectId = await nextSupabaseProjectId();
-  await supabase.insert('projects', submissionToProjectRow(submission, projectId), {
-    upsert: true,
-    onConflict: 'id',
-  });
+  await writeSupabaseProject(
+    row => supabase.insert('projects', row, { upsert: true, onConflict: 'id' }),
+    submissionToProjectRow(submission, projectId)
+  );
   invalidateProjectsCache();
   return projectId;
 }
@@ -515,10 +550,16 @@ async function writeSubmissions(submissions) {
       created_at: submission.createdAt || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }));
-    if (rows.length) {
-      await supabase.insert('project_submissions', rows, { upsert: true, onConflict: 'id' });
+    try {
+      if (rows.length) {
+        await supabase.insert('project_submissions', rows, { upsert: true, onConflict: 'id' });
+      }
+      submissionsCache = { rows: submissions, at: Date.now() };
+    } catch (error) {
+      // Callers may have pushed into the cached array before this write.
+      submissionsCache = null;
+      throw error;
     }
-    submissionsCache = { rows: submissions, at: Date.now() };
     return;
   }
   try {
@@ -760,17 +801,20 @@ app.put('/api/projects/:id', requireMemberOrAdminApi, async (req, res) => {
 // Mirror edited fields back into projects.xlsx so the sheet stays the record.
 async function doSyncProjectRow(submission) {
   if (USE_SUPABASE) {
-    const updated = await supabase.update('projects', supabase.eq('id', submission.id), {
-      title: submission.project || '',
-      operator: submission.operator || '',
-      commodities_text: listText(submission.commodities),
-      deposit_types_text: listText(submission.depositTypes),
-      project_stage: submission.projectStage || '',
-      resource_estimate: submission.resourceEstimate || '',
-      resource_source: submission.resourceSource || '',
-      website: submission.website || '',
-      data_room_url: submission.dataRoomUrl || '',
-    });
+    const updated = await writeSupabaseProject(
+      patch => supabase.update('projects', supabase.eq('id', submission.id), patch),
+      {
+        title: submission.project || '',
+        operator: submission.operator || '',
+        commodities_text: listText(submission.commodities),
+        deposit_types_text: listText(submission.depositTypes),
+        project_stage: submission.projectStage || '',
+        resource_estimate: submission.resourceEstimate || '',
+        resource_source: submission.resourceSource || '',
+        website: submission.website || '',
+        data_room_url: submission.dataRoomUrl || '',
+      }
+    );
     invalidateProjectsCache();
     return !!(updated && updated.length);
   }
@@ -1793,8 +1837,16 @@ async function loadAllProjects() {
 
   const pending = (async () => {
     if (USE_SUPABASE) {
-      const rows = await supabase.select('projects', 'select=*&order=created_at.desc');
-      const out = rows.map(supabaseProjectToRow);
+      const [rows, submissions] = await Promise.all([
+        supabase.select('projects', 'select=*&order=created_at.desc'),
+        readSubmissions(),
+      ]);
+      const dataRooms = new Map(submissions.map(item => [item.id, item.dataRoomUrl || '']));
+      const out = rows.map(row => {
+        const project = supabaseProjectToRow(row);
+        project.dataRoomUrl ||= dataRooms.get(project.id) || '';
+        return project;
+      });
       projectsCache = { rows: out, at: Date.now() };
       return out;
     }
