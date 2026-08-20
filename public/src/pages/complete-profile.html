@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/styles.css" />
+  <title>Complete Your Profile · NSPA</title>
+</head>
+<body class="auth-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <main class="page-wrap auth-wrap" id="main">
+    <header class="page-header auth-header">
+      <p class="eyebrow">Nova Scotia Prospectors Association</p>
+      <h1>Complete Your <span>Profile</span></h1>
+      <p class="subtitle">Wix has authenticated your account. Add only the membership details it did not provide.</p>
+    </header>
+
+    <div class="form-card auth-card auth-card-single">
+      <section class="form-section auth-panel auth-panel-primary" aria-labelledby="profile-title">
+        <div class="auth-panel-heading">
+          <span class="auth-panel-index">02</span>
+          <div>
+            <p class="auth-panel-kicker">Membership details</p>
+            <h2 id="profile-title">Tell us what is missing</h2>
+            <p>Information already supplied by Wix, Google, or Facebook is reused automatically.</p>
+          </div>
+        </div>
+
+        <p class="auth-email-summary">Signed in as <strong id="wix-profile-email"></strong></p>
+
+        <form id="wix-profile-form" hidden>
+          <div class="grid-2">
+            <div class="field" data-profile-field>
+              <label for="wix-profile-firstName">First Name</label>
+              <input type="text" id="wix-profile-firstName" maxlength="80" autocomplete="given-name" />
+            </div>
+            <div class="field" data-profile-field>
+              <label for="wix-profile-lastName">Last Name</label>
+              <input type="text" id="wix-profile-lastName" maxlength="80" autocomplete="family-name" />
+            </div>
+            <div class="field full" data-profile-field>
+              <label for="wix-profile-phone">Phone Number</label>
+              <input type="tel" id="wix-profile-phone" maxlength="30" placeholder="(902) 555-0100" autocomplete="tel" />
+            </div>
+          </div>
+          <button class="submit-btn auth-submit" id="complete-profile-btn" type="submit">
+            Continue to Membership
+            <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 7.5h9M8 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </form>
+      </section>
+    </div>
+
+    <div class="auth-trust-note">
+      <span class="auth-trust-icon" aria-hidden="true">
+        <svg viewBox="0 0 18 18" fill="none"><path d="M9 1.75 15 4v4.3c0 3.7-2.4 6.4-6 7.95-3.6-1.55-6-4.25-6-7.95V4l6-2.25Z" stroke="currentColor" stroke-width="1.25"/><path d="m6.4 8.9 1.7 1.7 3.5-3.7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <p>Your Wix email is linked to the NSPA member registry and is not requested again.</p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/modules/portal.js"></script>
+  <script src="/modules/public-pages.js"></script>
+</body>
+</html>

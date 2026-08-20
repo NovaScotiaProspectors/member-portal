@@ -34,7 +34,7 @@ function registerPageRoutes(app, {
   app.get('/', (req, res) => res.sendFile(path.join(pagesDir, 'home.html')));
   app.get('/index.html', requireMemberPage, (req, res) => res.sendFile(path.join(pagesDir, 'index.html')));
 
-  for (const page of ['home.html', 'signup.html', 'membership.html', 'prices.html']) {
+  for (const page of ['home.html', 'signup.html', 'complete-profile.html', 'membership.html', 'prices.html']) {
     app.get(`/${page}`, (req, res) => res.sendFile(path.join(pagesDir, page)));
   }
 

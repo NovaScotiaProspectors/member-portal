@@ -1,119 +1,40 @@
 const crypto = require('crypto');
 const { safeNextPath } = require('../utils/nextPath');
 
+function missingProfileFields(user) {
+  if (!user) return ['firstName', 'lastName', 'phone'];
+  return ['firstName', 'lastName', 'phone'].filter(field => !String(user[field] || '').trim());
+}
+
+function completeProfileUrl(next) {
+  const safe = safeNextPath(next);
+  return `/complete-profile.html${safe ? `?next=${encodeURIComponent(safe)}` : ''}`;
+}
+
 function registerAuthRoutes(app, ctx) {
   const {
-    findUserByEmail, updateMembership, hashPassword, appendUser, invalidateSessionUser,
-    setSession, clearSession, verifyPassword, isActiveMember, publicMember, isAdmin, requireAuth,
-    serializeNetworkVisibility, DEFAULT_NETWORK_VISIBILITY, ZEFFY_STUDENT_URL, ZEFFY_REGULAR_URL,
+    findUserByEmail, updateMembership, appendUser, invalidateSessionUser,
+    setSession, clearSession, isActiveMember, publicMember, isAdmin, requireAuth,
+    ZEFFY_STUDENT_URL, ZEFFY_REGULAR_URL,
     WIX_SITE_URL, WIX_MEMBER_LOGIN_URL, APP_BASE_URL, wixAuth, secureCookies,
     findUserByWixMemberId, zeffy,
   } = ctx;
 
-  app.post('/api/signup', async (req, res) => {
-    try {
-      const firstName = String(req.body.firstName || '').trim();
-      const lastName  = String(req.body.lastName || '').trim();
-      const email     = String(req.body.email || '').trim();
-      const phone     = String(req.body.phone || '').trim();
-      const password  = String(req.body.password || '');
-  
-      if (!firstName || !lastName) {
-        return res.status(400).json({ error: 'First and last name are required.' });
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: 'A valid email address is required.' });
-      }
-      if (password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-      }
-  
-      const existing = await findUserByEmail(email);
-      if (existing) {
-        if ((existing.accountStatus || 'active') !== 'deactivated') {
-          return res.status(409).json({ error: 'An account with that email already exists.' });
-        }
-  
-        // Restore a previously deactivated account: reuse its original member ID
-        // and keep its project history, just refresh the credentials/details.
-        await updateMembership(email, {
-          firstName,
-          lastName,
-          phone,
-          passwordHash: hashPassword(password),
-          accountStatus: 'active',
-          membershipStatus: 'pending_payment',
-          memberSince: '',
-          networkStatus: 'out',
-          networkVisibility: serializeNetworkVisibility(DEFAULT_NETWORK_VISIBILITY),
-        });
-        invalidateSessionUser(email);
-        setSession(res, email);
-        return res.status(200).json({
-          ok: true,
-          restored: true,
-          member: { memberId: existing.memberId, firstName, lastName, email, phone, membershipStatus: 'pending_payment', isMember: false },
-        });
-      }
-  
-      const memberId = await appendUser({ firstName, lastName, email, phone, password });
-      invalidateSessionUser(email);
-      setSession(res, email);
-      res.status(201).json({
-        ok: true,
-        member: { memberId, firstName, lastName, email, phone, membershipStatus: 'pending_payment', isMember: false },
-      });
-    } catch (error) {
-      if (error.code === 'DUP') return res.status(409).json({ error: error.message });
-      console.error('signup:', error);
-      res.status(500).json({ error: 'Could not save your sign-up. Please try again.' });
-    }
+  // Authentication is owned by Wix. Keeping these old endpoints closed prevents
+  // a second password/account system from drifting out of sync with Wix members.
+  const wixOnly = (req, res) => res.status(410).json({
+    error: 'Sign up and login are handled through Wix.',
+    loginUrl: `${APP_BASE_URL}/api/auth/wix`,
   });
-  
-  app.post('/api/signin', async (req, res) => {
-    try {
-      const email = String(req.body.email || '').trim();
-      const password = String(req.body.password || '');
-  
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
-        return res.status(400).json({ error: 'Email and password are required.' });
-      }
-  
-      const user = await findUserByEmail(email);
-      if (user && (user.accountStatus || 'active') === 'deactivated') {
-        return res.status(403).json({
-          error: 'This account was deactivated. Sign up again with the same email to restore it.',
-          deactivated: true,
-        });
-      }
-      if (!user || !verifyPassword(password, user.passwordHash)) {
-        return res.status(401).json({ error: 'Invalid email or password.' });
-      }
-  
-      setSession(res, user.email);
-      res.json({
-        ok: true,
-        member: {
-          memberId: user.memberId,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          phone: user.phone,
-          membershipStatus: user.membershipStatus,
-          isMember: isActiveMember(user),
-          membershipExpiry: user.membershipExpiry || null,
-        },
-      });
-    } catch (error) {
-      console.error('signin:', error);
-      res.status(500).json({ error: 'Could not sign in. Please try again.' });
-    }
-  });
+  app.post('/api/signup', wixOnly);
+  app.post('/api/signin', wixOnly);
   
   app.get('/api/me', async (req, res) => {
     res.json({
       authenticated: !!req.user,
       member: await publicMember(req.user),
+      profileComplete: !!req.user && missingProfileFields(req.user).length === 0,
+      missingProfileFields: missingProfileFields(req.user),
       isAdmin: isAdmin(req.user),
       wixSiteUrl: WIX_SITE_URL,
       wixMemberLoginUrl: req.user ? '' : (wixAuth.configured ? `${APP_BASE_URL}/api/auth/wix` : WIX_MEMBER_LOGIN_URL),
@@ -208,25 +129,72 @@ function registerAuthRoutes(app, ctx) {
       }
       if (!user) {
         await appendUser({
-          firstName: identity.firstName || identity.email.split('@')[0],
-          lastName: identity.lastName || 'Member',
+          firstName: identity.firstName,
+          lastName: identity.lastName,
           email: identity.email,
           phone: identity.phone,
           password: crypto.randomBytes(48).toString('base64url'),
           wixMemberId: identity.wixMemberId,
         });
         user = await findUserByEmail(identity.email);
-      } else if (!user.wixMemberId || (user.accountStatus || 'active') === 'deactivated') {
-        await updateMembership(user.email, { wixMemberId: identity.wixMemberId, accountStatus: 'active' });
-        invalidateSessionUser(user.email);
-        user = await findUserByEmail(user.email);
+      } else {
+        const updates = {};
+        if (!user.wixMemberId) updates.wixMemberId = identity.wixMemberId;
+        if ((user.accountStatus || 'active') === 'deactivated') updates.accountStatus = 'active';
+        // Social login often supplies a name. Fill only blank registry fields;
+        // never overwrite details the member has already confirmed.
+        if (!String(user.firstName || '').trim() && identity.firstName) updates.firstName = identity.firstName;
+        if (!String(user.lastName || '').trim() && identity.lastName) updates.lastName = identity.lastName;
+        if (!String(user.phone || '').trim() && identity.phone) updates.phone = identity.phone;
+        if (Object.keys(updates).length) {
+          await updateMembership(user.email, updates);
+          invalidateSessionUser(user.email);
+          user = await findUserByEmail(user.email);
+        }
       }
 
       setSession(res, user.email);
+      if (missingProfileFields(user).length) return res.redirect(completeProfileUrl(next));
       return res.redirect(isActiveMember(user) ? (next || '/dashboard.html') : '/membership.html');
     } catch (error) {
       console.error('wix callback:', error);
       return res.status(502).send('Could not complete Wix sign-in.');
+    }
+  });
+
+  app.post('/api/auth/wix/profile', requireAuth, async (req, res) => {
+    try {
+      if (!req.user.wixMemberId) {
+        return res.status(403).json({ error: 'Complete Wix sign-in before updating your account.' });
+      }
+
+      const body = req.body || {};
+      const firstName = String(body.firstName || req.user.firstName || '').trim();
+      const lastName = String(body.lastName || req.user.lastName || '').trim();
+      const phone = String(body.phone || req.user.phone || '').trim();
+      if (!firstName || !lastName || !phone) {
+        return res.status(400).json({ error: 'First name, last name, and phone number are required.' });
+      }
+      if (firstName.length > 80 || lastName.length > 80) {
+        return res.status(400).json({ error: 'First and last names must be 80 characters or fewer.' });
+      }
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phone.length > 30 || phoneDigits.length < 7 || phoneDigits.length > 15) {
+        return res.status(400).json({ error: 'Enter a valid phone number.' });
+      }
+
+      await updateMembership(req.user.email, { firstName, lastName, phone });
+      invalidateSessionUser(req.user.email);
+      const user = await findUserByEmail(req.user.email);
+      const next = safeNextPath(body.next);
+      res.json({
+        ok: true,
+        member: await publicMember(user),
+        next: isActiveMember(user) ? (next || '/dashboard.html') : '/membership.html',
+      });
+    } catch (error) {
+      console.error('wix profile:', error);
+      res.status(500).json({ error: 'Could not save your details. Please try again.' });
     }
   });
   

@@ -1,133 +1,82 @@
 'use strict';
 
+function safePortalNext(value) {
+  const next = String(value || '').trim();
+  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return '';
+  if (/[\x00-\x1f\x7f]/.test(next)) return '';
+  return next.slice(0, 512);
+}
+
 /* signup */
 if (location.pathname === '/signup.html') {
   (() => {
+    const next = safePortalNext(new URLSearchParams(location.search).get('next'));
+    const wixButton = document.getElementById('wix-signin-btn');
+    if (wixButton) wixButton.href = `/api/auth/wix${next ? `?next=${encodeURIComponent(next)}` : ''}`;
+
+    NSPA.getSession().then(me => {
+      if (!me.authenticated || !me.member) return;
+      if (!me.profileComplete) {
+        window.location.replace(`/complete-profile.html${next ? `?next=${encodeURIComponent(next)}` : ''}`);
+        return;
+      }
+      window.location.replace(me.member.isMember ? (next || '/dashboard.html') : '/membership.html');
+    });
+  })();
+}
+
+/* Wix profile completion */
+if (location.pathname === '/complete-profile.html') {
+  (() => {
     const showToast = NSPA.showToast;
-    
-        const btn = document.getElementById('signup-btn');
-        const signinBtn = document.getElementById('signin-btn');
-    
-        // Where to go after signing in. A guarded page that bounced the user here
-        // passes itself as ?next=… so they land back where they were headed.
-        // Where to send someone once they are signed in. A guarded page passes
-        // itself as ?next=…; otherwise it depends on what they can actually
-        // reach — the project form is members-only, so sending a brand-new
-        // pending-payment account there just bounces them to /membership.html.
-        function nextUrl(member) {
-          const next = new URLSearchParams(location.search).get('next');
-          // Same-origin paths only — never follow an absolute URL from the query.
-          if (next && next.startsWith('/') && !next.startsWith('//')) return next;
-          return member && member.isMember ? '/index.html' : '/membership.html';
-        }
-    
-        function openProjectForm(member) {
-          NSPA.cacheMember(member);
-          window.location.href = nextUrl(member);
-        }
-    
-        // Already signed in (e.g. opened this page in a new tab)? Skip the form.
-        NSPA.getSession().then(me => {
-          const wixButton = document.getElementById('wix-signin-btn');
-          if (wixButton && me.wixSsoEnabled) {
-            const next = new URLSearchParams(location.search).get('next');
-            wixButton.href = `/api/auth/wix${next ? `?next=${encodeURIComponent(next)}` : ''}`;
-            wixButton.hidden = false;
-          }
-          if (me.authenticated && me.member) {
-            showToast(`You're already signed in as ${me.member.firstName || me.member.email}.`, 'success');
-            setTimeout(() => { window.location.href = nextUrl(me.member); }, 600);
-          }
+    const form = document.getElementById('wix-profile-form');
+    const submit = document.getElementById('complete-profile-btn');
+    const next = safePortalNext(new URLSearchParams(location.search).get('next'));
+
+    NSPA.getSession().then(me => {
+      if (!me.authenticated || !me.member) {
+        window.location.replace(`/api/auth/wix${next ? `?next=${encodeURIComponent(next)}` : ''}`);
+        return;
+      }
+      if (me.profileComplete) {
+        window.location.replace(me.member.isMember ? (next || '/dashboard.html') : '/membership.html');
+        return;
+      }
+
+      document.getElementById('wix-profile-email').textContent = me.member.email;
+      for (const field of ['firstName', 'lastName', 'phone']) {
+        const input = document.getElementById(`wix-profile-${field}`);
+        const wrapper = input.closest('[data-profile-field]');
+        const value = String(me.member[field] || '').trim();
+        input.value = value;
+        wrapper.hidden = !!value;
+      }
+      form.hidden = false;
+    }).catch(() => showToast('Could not load your Wix account.', 'error'));
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      submit.disabled = true;
+      try {
+        const response = await fetch('/api/auth/wix/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstName: document.getElementById('wix-profile-firstName').value,
+            lastName: document.getElementById('wix-profile-lastName').value,
+            phone: document.getElementById('wix-profile-phone').value,
+            next,
+          }),
         });
-    
-        btn.addEventListener('click', async () => {
-          const firstName = document.getElementById('su-first').value.trim();
-          const lastName  = document.getElementById('su-last').value.trim();
-          const email     = document.getElementById('su-email').value.trim();
-          const phone     = document.getElementById('su-phone').value.trim();
-          const password  = document.getElementById('su-password').value;
-          const confirm   = document.getElementById('su-confirm').value;
-    
-          if (!firstName || !lastName) {
-            showToast('Please enter your first and last name.', 'error');
-            return;
-          }
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            showToast('Please enter a valid email address.', 'error');
-            return;
-          }
-          if (password.length < 8) {
-            showToast('Password must be at least 8 characters.', 'error');
-            return;
-          }
-          if (password !== confirm) {
-            showToast('Passwords do not match.', 'error');
-            return;
-          }
-    
-          btn.disabled = true;
-          try {
-            const res = await fetch('/api/signup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ firstName, lastName, email, phone, password })
-            });
-            const data = await res.json().catch(() => ({}));
-    
-            if (!res.ok) throw new Error(data.error || 'Sign-up failed.');
-    
-            showToast(
-              data.restored
-                ? `Welcome back, ${firstName}! Your account and member ID have been restored.`
-                : `Welcome, ${firstName}! Choose your membership to continue.`,
-              'success'
-            );
-            setTimeout(() => openProjectForm(data.member || { firstName, lastName, email, phone }), 700);
-          } catch (err) {
-            showToast(err.message || 'Could not create your account.', 'error');
-          } finally {
-            btn.disabled = false;
-          }
-        });
-    
-        signinBtn.addEventListener('click', async () => {
-          const email = document.getElementById('si-email').value.trim();
-          const password = document.getElementById('si-password').value;
-    
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
-            showToast('Please enter your email and password.', 'error');
-            return;
-          }
-    
-          signinBtn.disabled = true;
-          try {
-            const res = await fetch('/api/signin', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password })
-            });
-            const data = await res.json().catch(() => ({}));
-    
-            if (!res.ok) {
-              // Server messages are already specific (invalid credentials,
-              // deactivated account); fall back by status code if absent.
-              const fallback = res.status === 401
-                ? 'Invalid email or password.'
-                : res.status >= 500
-                  ? 'The server had a problem signing you in. Please try again in a moment.'
-                  : 'Sign-in failed.';
-              throw new Error(data.error || fallback);
-            }
-    
-            showToast(`Welcome back, ${data.member.firstName || 'member'}!`, 'success');
-            setTimeout(() => openProjectForm(data.member), 450);
-          } catch (err) {
-            const offline = err instanceof TypeError; // fetch network failure
-            showToast(offline ? 'Could not reach the server — check your connection.' : (err.message || 'Could not sign in.'), 'error');
-          } finally {
-            signinBtn.disabled = false;
-          }
-        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Could not save your details.');
+        NSPA.cacheMember(data.member);
+        window.location.href = data.next;
+      } catch (error) {
+        showToast(error.message || 'Could not save your details.', 'error');
+        submit.disabled = false;
+      }
+    });
   })();
 }
 
@@ -160,6 +109,11 @@ if (location.pathname === '/membership.html') {
               <p class="section-label">Membership</p>
               <p class="membership-lead">You need an account before you can join.</p>
               <a class="submit-btn" href="${esc(loginUrl)}">Member Login</a>`;
+            return;
+          }
+
+          if (!me.profileComplete) {
+            window.location.replace('/complete-profile.html');
             return;
           }
     

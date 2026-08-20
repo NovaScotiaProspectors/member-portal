@@ -2581,6 +2581,29 @@ textarea:focus,
   overflow: hidden;
 }
 
+.auth-card-single {
+  display: block;
+  max-width: 720px;
+}
+
+.auth-card-single .auth-panel-primary { padding: 46px; }
+
+.auth-provider-note {
+  max-width: 58ch;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.auth-email-summary {
+  margin: 0 0 28px 50px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.auth-email-summary strong { color: var(--gold-light); }
+
+[data-profile-field][hidden] { display: none; }
+
 .auth-panel {
   border-bottom: 0;
   min-width: 0;
@@ -2728,6 +2751,8 @@ input:-webkit-autofill:active {
   .auth-panel-index { width: 30px; height: 30px; flex-basis: 30px; }
   .auth-panel-primary .grid-2 { gap: 18px; }
   .auth-trust-note { align-items: flex-start; text-align: left; }
+  .auth-card-single .auth-panel-primary { padding: 28px 22px 30px; }
+  .auth-email-summary { margin-left: 0; }
 }
 
 /* ── Project form member navigation ────────────────────────────────────── */
