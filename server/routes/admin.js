@@ -36,12 +36,15 @@ function registerAdminRoutes(app, ctx) {
     const status = await verifyMailer();
     if (!status.configured) {
       return res.status(503).json({
-        error: 'Email is not configured. Set MAILERSEND_API_KEY and MAIL_FROM in the environment, then restart.',
         ...status,
+        error: 'Email is not configured. Set MAILERSEND_API_KEY and MAIL_FROM in the environment, then restart.',
       });
     }
     if (!status.verified) {
-      return res.status(502).json({ error: `The mail provider rejected the connection: ${status.error}`, ...status });
+      return res.status(502).json({
+        ...status,
+        error: `The mail provider rejected the connection: ${status.error}`,
+      });
     }
 
     const to = String(req.body.to || req.user.email || '').trim();
@@ -59,7 +62,7 @@ function registerAdminRoutes(app, ctx) {
     } catch (error) {
       // mail.js has already scrubbed the API key out of this message.
       console.warn('admin mail test: send failed —', error.message);
-      res.status(502).json({ error: `Could not send: ${error.message}`, ...status });
+      res.status(502).json({ ...status, error: `Could not send: ${error.message}` });
     }
   });
 
