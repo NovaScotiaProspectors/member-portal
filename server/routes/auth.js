@@ -39,7 +39,21 @@ function wixCallbackRelayPage() {
 
 function missingProfileFields(user) {
   if (!user) return ['firstName', 'lastName', 'phone'];
-  return ['firstName', 'lastName', 'phone'].filter(field => !String(user[field] || '').trim());
+  const missing = ['firstName', 'lastName', 'phone'].filter(field => !String(user[field] || '').trim());
+  for (const field of legacyGeneratedNameFields(user)) {
+    if (!missing.includes(field)) missing.push(field);
+  }
+  return missing;
+}
+
+function legacyGeneratedNameFields(user) {
+  if (!user) return [];
+  const emailPrefix = String(user.email || '').trim().toLowerCase().split('@')[0];
+  const firstName = String(user.firstName || '').trim().toLowerCase();
+  const lastName = String(user.lastName || '').trim().toLowerCase();
+  return emailPrefix && firstName === emailPrefix && (!lastName || lastName === 'member')
+    ? ['firstName', 'lastName']
+    : [];
 }
 
 function completeProfileUrl(next) {
@@ -191,10 +205,13 @@ function registerAuthRoutes(app, ctx) {
       }
       if (!user) {
         await appendUser({
-          firstName: identity.firstName,
-          lastName: identity.lastName,
+          // Wix owns authentication and supplies the verified email/member ID.
+          // NSPA profile details are confirmed explicitly in the portal once,
+          // so provider guesses never become member names.
+          firstName: '',
+          lastName: '',
           email: identity.email,
-          phone: identity.phone,
+          phone: '',
           password: crypto.randomBytes(48).toString('base64url'),
           wixMemberId: identity.wixMemberId,
         });
@@ -203,11 +220,6 @@ function registerAuthRoutes(app, ctx) {
         const updates = {};
         if (!user.wixMemberId) updates.wixMemberId = identity.wixMemberId;
         if ((user.accountStatus || 'active') === 'deactivated') updates.accountStatus = 'active';
-        // Social login often supplies a name. Fill only blank registry fields;
-        // never overwrite details the member has already confirmed.
-        if (!String(user.firstName || '').trim() && identity.firstName) updates.firstName = identity.firstName;
-        if (!String(user.lastName || '').trim() && identity.lastName) updates.lastName = identity.lastName;
-        if (!String(user.phone || '').trim() && identity.phone) updates.phone = identity.phone;
         if (Object.keys(updates).length) {
           await updateMembership(user.email, updates);
           invalidateSessionUser(user.email);

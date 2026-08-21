@@ -44,12 +44,14 @@ if (location.pathname === '/complete-profile.html') {
       }
 
       document.getElementById('wix-profile-email').textContent = me.member.email;
+      const missingFields = new Set(me.missingProfileFields || []);
       for (const field of ['firstName', 'lastName', 'phone']) {
         const input = document.getElementById(`wix-profile-${field}`);
         const wrapper = input.closest('[data-profile-field]');
         const value = String(me.member[field] || '').trim();
-        input.value = value;
-        wrapper.hidden = !!value;
+        const needsConfirmation = missingFields.has(field);
+        input.value = needsConfirmation ? '' : value;
+        wrapper.hidden = !needsConfirmation;
       }
       form.hidden = false;
     }).catch(() => showToast('Could not load your Wix account.', 'error'));
