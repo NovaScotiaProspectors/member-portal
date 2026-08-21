@@ -14,7 +14,6 @@
     { href: '/map.html',        label: 'Map',          match: ['/project.html', '/compare.html'] },
     { href: '/network.html',    label: 'Network',      match: ['/member.html'] },
     { href: '/events.html',     label: 'Events' },
-    { href: '/resources.html',  label: 'Resources' },
     { href: '/membership.html', label: 'Join' },
   ];
 
@@ -33,7 +32,7 @@
   // membership; notifications are reached through the bell.
   const MEMBER_ONLY = [
     '/index.html', '/dashboard.html', '/network.html',
-    '/notifications.html', '/saved.html', '/events.html', '/resources.html',
+    '/notifications.html', '/saved.html', '/events.html',
     '/activity.html', '/search.html', '/project.html', '/compare.html',
     '/member.html', '/field.html', '/claims.html',
   ];

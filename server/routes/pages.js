@@ -44,7 +44,7 @@ function registerPageRoutes(app, {
   app.get('/map.html', (req, res) => res.sendFile(path.join(pagesDir, 'map.html')));
 
   for (const page of [
-    'notifications.html', 'saved.html', 'events.html', 'resources.html', 'activity.html',
+    'notifications.html', 'saved.html', 'events.html', 'activity.html',
     'project.html', 'search.html', 'compare.html', 'member.html', 'field.html',
     'claims.html',
   ]) {
