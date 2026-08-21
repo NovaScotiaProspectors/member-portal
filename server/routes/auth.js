@@ -1,6 +1,42 @@
 const crypto = require('crypto');
 const { safeNextPath } = require('../utils/nextPath');
 
+const WIX_FLOW_COOKIE_PREFIX = 'nspa_wix_flow_';
+
+function wixFlowCookieName(state) {
+  const value = String(state || '');
+  return /^[A-Za-z0-9_-]{20,128}$/.test(value) ? `${WIX_FLOW_COOKIE_PREFIX}${value}` : '';
+}
+
+function wixCallbackRelayPage() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Completing sign-in</title>
+</head>
+<body>
+  <p>Completing Wix sign-in…</p>
+  <script>
+    (() => {
+      const source = new URLSearchParams(window.location.hash.slice(1));
+      const result = new URLSearchParams();
+      for (const name of ['code', 'state', 'error', 'error_description']) {
+        if (source.has(name)) result.set(name, source.get(name));
+      }
+      const destination = result.size
+        ? '/api/auth/wix/complete?' + result.toString()
+        : '/api/auth/wix';
+      window.location.replace(destination);
+    })();
+  </script>
+  <noscript>JavaScript is required to complete Wix sign-in.</noscript>
+</body>
+</html>`;
+}
+
 function missingProfileFields(user) {
   if (!user) return ['firstName', 'lastName', 'phone'];
   return ['firstName', 'lastName', 'phone'].filter(field => !String(user[field] || '').trim());
@@ -79,16 +115,27 @@ function registerAuthRoutes(app, ctx) {
     signed: true,
     sameSite: 'lax',
     secure: secureCookies,
-    maxAge: 10 * 60 * 1000,
+    path: '/',
+    maxAge: 30 * 60 * 1000,
+  };
+
+  const wixClearCookieOptions = {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secureCookies,
+    path: '/',
   };
 
   app.get('/api/auth/wix', async (req, res) => {
     if (!wixAuth.configured) return res.status(503).send('Wix sign-in is not configured.');
     try {
       const flow = await wixAuth.begin();
-      res.cookie('nspa_wix_state', flow.state, wixCookieOptions);
-      res.cookie('nspa_wix_verifier', flow.verifier, wixCookieOptions);
-      res.cookie('nspa_wix_next', safeNextPath(req.query.next), wixCookieOptions);
+      const cookieName = wixFlowCookieName(flow.state);
+      if (!cookieName) throw new Error('Wix returned an invalid OAuth state.');
+      res.cookie(cookieName, JSON.stringify({
+        verifier: flow.verifier,
+        next: safeNextPath(req.query.next),
+      }), wixCookieOptions);
       return res.redirect(flow.url);
     } catch (error) {
       console.error('wix sign-in:', error);
@@ -96,25 +143,40 @@ function registerAuthRoutes(app, ctx) {
     }
   });
 
-  app.get('/api/auth/wix/callback', async (req, res) => {
-    // Read the one-time cookies, then clear them immediately — before any
-    // response is sent. Clearing afterwards (in a `finally`, say) sets headers
-    // on a request that has already been answered, which throws
-    // ERR_HTTP_HEADERS_SENT and takes the process down with it.
+  async function completeWixSignIn(req, res) {
     const signedCookies = req.signedCookies || {};
-    const next = safeNextPath(signedCookies.nspa_wix_next);
-    const expectedState = String(signedCookies.nspa_wix_state || '');
-    const verifier = String(signedCookies.nspa_wix_verifier || '');
+    const state = String(req.query.state || '');
+    const cookieName = wixFlowCookieName(state);
+    let next = '';
+    let verifier = '';
+
+    if (cookieName && signedCookies[cookieName]) {
+      try {
+        const flow = JSON.parse(String(signedCookies[cookieName]));
+        next = safeNextPath(flow.next);
+        verifier = String(flow.verifier || '');
+      } catch {}
+      res.clearCookie(cookieName, wixClearCookieOptions);
+    } else {
+      // Accept an OAuth attempt started by the previous deployment so users
+      // already on Wix's login screen are not broken during rollout.
+      const expectedState = String(signedCookies.nspa_wix_state || '');
+      if (expectedState && state === expectedState) {
+        next = safeNextPath(signedCookies.nspa_wix_next);
+        verifier = String(signedCookies.nspa_wix_verifier || '');
+      }
+    }
+
     for (const name of ['nspa_wix_state', 'nspa_wix_verifier', 'nspa_wix_next']) {
-      res.clearCookie(name, { sameSite: 'lax', secure: secureCookies });
+      res.clearCookie(name, wixClearCookieOptions);
     }
 
     try {
       if (req.query.error) throw new Error(`Wix rejected sign-in: ${req.query.error}`);
-      const state = String(req.query.state || '');
       const code = String(req.query.code || '');
-      if (!state || !expectedState || state !== expectedState || !verifier || !code) {
-        return res.status(400).send('Invalid or expired Wix sign-in.');
+      if (!state || !verifier || !code) {
+        const retry = `/api/auth/wix${next ? `?next=${encodeURIComponent(next)}` : ''}`;
+        return res.status(400).send(`Invalid or expired Wix sign-in. <a href="${retry}">Try again</a>.`);
       }
 
       const identity = await wixAuth.finish({ code, verifier });
@@ -160,7 +222,21 @@ function registerAuthRoutes(app, ctx) {
       console.error('wix callback:', error);
       return res.status(502).send('Could not complete Wix sign-in.');
     }
+  }
+
+  app.get('/api/auth/wix/callback', async (req, res) => {
+    // Wix's current managed-login flow returns code/state in the fragment.
+    // Fragments never reach a server, so this same-origin relay moves only the
+    // expected OAuth fields into a request the server can validate.
+    if (!req.query.code && !req.query.state && !req.query.error) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(wixCallbackRelayPage());
+    }
+    return completeWixSignIn(req, res);
   });
+
+  app.get('/api/auth/wix/complete', completeWixSignIn);
 
   app.post('/api/auth/wix/profile', requireAuth, async (req, res) => {
     try {

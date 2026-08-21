@@ -75,7 +75,10 @@ function createWixAuth({ clientId, redirectUri, fetchImpl = fetch } = {}) {
             clientId: id,
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
-            responseMode: 'query',
+            // Wix-managed login returns the authorization result in a URL
+            // fragment. The callback page relays it to the server after Wix
+            // finishes rendering the login flow.
+            responseMode: 'fragment',
             responseType: 'code',
             scope: 'offline_access',
             state,
