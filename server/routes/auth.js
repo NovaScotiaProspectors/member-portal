@@ -252,10 +252,6 @@ function registerAuthRoutes(app, ctx) {
 
   app.post('/api/auth/wix/profile', requireAuth, async (req, res) => {
     try {
-      if (!req.user.wixMemberId) {
-        return res.status(403).json({ error: 'Complete Wix sign-in before updating your account.' });
-      }
-
       const body = req.body || {};
       const firstName = String(body.firstName || req.user.firstName || '').trim();
       const lastName = String(body.lastName || req.user.lastName || '').trim();
