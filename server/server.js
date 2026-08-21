@@ -28,6 +28,7 @@ const { createWixAuth } = require('./services/wixAuth');
 const { clampInt } = require('./utils/numbers');
 const { parseDataRoomUrl, planProjectEdit } = require('./projectEdits');
 const { nextQuery } = require('./utils/nextPath');
+const { membershipExpiryDate } = require('./membershipExpiry');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -1300,18 +1301,6 @@ function publicProfile(profile) {
     socials: p.socials,
     hasAvatar: !!p.avatar,
   };
-}
-
-// All memberships expire on 31 December. New members who enrol on or after
-// 1 July get the remainder of the current year at no additional cost — their
-// payment is applied to the following membership year, so they expire on
-// 31 December of NEXT year (e.g. joining 16 July 2026 runs through
-// 31 December 2027). Renewals always expire 31 December of the current year.
-function membershipExpiryDate({ newMember = false } = {}) {
-  const now = new Date();
-  let year = now.getFullYear();
-  if (newMember && now.getMonth() >= 6) year += 1; // months are 0-based: 6 = July
-  return new Date(Date.UTC(year, 11, 31, 23, 59, 59)).toISOString();
 }
 
 // Numbers-only member ID (5-digit, zero-padded). Extracts digits from any
@@ -3409,7 +3398,7 @@ function updateMembership(email, updates) {
   return run;
 }
 
-async function activateMembership(email, paymentCustomerId, paymentReferenceId) {
+async function activateMembership(email, paymentCustomerId, paymentReferenceId, { nspaActivation = false } = {}) {
   if (!email) return false;
   const user = await findUserByEmail(email);
   if (!user) return false;
@@ -3419,7 +3408,13 @@ async function activateMembership(email, paymentCustomerId, paymentReferenceId) 
   // A first-time member has no memberSince yet (their member ID was only just
   // issued). The July-1 bonus applies to them, not to lapsed-member renewals.
   const newMember = !user || !user.memberSince;
-  const updates = { accountStatus: 'active', membershipStatus: 'active', membershipExpiry: membershipExpiryDate({ newMember }) };
+  const updates = {
+    accountStatus: 'active',
+    membershipStatus: 'active',
+    // The July bonus applies to paid first-time enrolments only. Accounts
+    // manually activated by NSPA always end on 31 December this year.
+    membershipExpiry: membershipExpiryDate({ newMember: newMember && !nspaActivation }),
+  };
   if (paymentCustomerId) updates.paymentCustomerId = paymentCustomerId;
   if (paymentReferenceId) updates.subscriptionId = paymentReferenceId;
   if (newMember) updates.memberSince = new Date().toISOString();

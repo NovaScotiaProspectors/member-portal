@@ -111,7 +111,7 @@ function registerAdminRoutes(app, ctx) {
       if (!user) return res.status(404).json({ error: 'Member not found.' });
 
       if (action === 'activate') {
-        await activateMembership(user.email, '', '');
+        await activateMembership(user.email, '', '', { nspaActivation: true });
       } else if (action === 'lapse') {
         await updateMembership(user.email, { membershipStatus: 'inactive', membershipExpiry: '' });
       } else if (action === 'deactivate') {
