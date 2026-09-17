@@ -215,7 +215,7 @@
     {
       id: 'mines', label: 'Historical mines', group: 'Mining',
       hint: 'Gold, iron and coal mining areas',
-      make: () => arcgis(NOVAROC, { showIds: '55,56,57,58', opacity: 0.8 }),
+      make: () => arcgis(NOVAROC, { showIds: '56,57,58', opacity: 0.8 }),
     },
     {
       id: 'occurrences', label: 'Mineral occurrences', group: 'Mining',
