@@ -121,12 +121,12 @@
       <header class="map-popup-head">
         <h3>${esc(name)}</h3>
       </header>
-      <div class="map-popup-grid">
-        ${rows.map(([k, v]) => `
-          <span>${esc(k)}</span>
-          <strong>${esc(v)}</strong>
-        `).join('')}
-      </div>
+<div class="map-popup-grid" style="display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; align-items:start;">
+  ${rows.map(([k, v]) => `
+    <span style="opacity:0.7;">${esc(k)}</span>
+    <strong>${esc(v)}</strong>
+  `).join('')}
+</div>
     </article>
   `);
 },
