@@ -118,19 +118,19 @@
   const baseLayers = [
     {
       id: 'dark', label: 'Dark', default: true,
-      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19,
       }),
     },
     {
       id: 'street', label: 'Street',
-      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19,
       }),
     },
     {
       id: 'light', label: 'Light',
-      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      make: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19,
       }),
     },
