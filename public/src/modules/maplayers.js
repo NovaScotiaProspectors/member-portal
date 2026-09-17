@@ -83,24 +83,53 @@
         fillOpacity: 0.85,
       }),
       onEachFeature: (feature, marker) => {
-        const p = feature.properties || {};
-        const name = firstProp(p, ['name', 'occurrence', 'occurrence_name', 'site_name', 'property', 'deposit']);
-        const commodity = firstProp(p, ['commodity', 'commodities', 'primary_commodity', 'mineral']);
-        const id = firstProp(p, ['id', 'occurrence_id', 'meb_id', 'deposit_id']);
-        const status = firstProp(p, ['status', 'development_status', 'deposit_type', 'type']);
-        const rows = [
-          id && ['ID', id],
-          commodity && ['Commodity', commodity],
-          status && ['Type/status', status],
-        ].filter(Boolean);
-        marker.bindPopup(`
-          <article class="map-popup">
-            <header class="map-popup-head"><h3>${esc(name || 'Mineral occurrence')}</h3></header>
-            <div class="map-popup-grid">
-              ${rows.map(([k, v]) => `<span>${esc(k)}</span><strong>${esc(v)}</strong>`).join('')}
-            </div>
-          </article>`);
-      },
+  const p = feature.properties || {};
+
+  const name = p.name || p.Name || 'Mineral occurrence';
+  const id = p.occ_num || p.ID;
+  const primaryCommodity = p.comm_prim || p.Commodity;
+  const occurrenceType = p.occ_type || p.Type;
+  const status = p.status || p.Status;
+  const commodityList = p.comm_list;
+  const county = p.county;
+
+  let otherCommodities = commodityList;
+
+  // Avoid repeating the primary commodity when it is also
+  // included in the full commodity list.
+  if (otherCommodities && primaryCommodity) {
+    const commodities = String(otherCommodities)
+      .split(/[,;]+/)
+      .map(value => value.trim())
+      .filter(Boolean)
+      .filter(value => value.toLowerCase() !== String(primaryCommodity).trim().toLowerCase());
+
+    otherCommodities = commodities.join(', ');
+  }
+
+  const rows = [
+    id && ['Occurrence ID', id],
+    primaryCommodity && ['Primary commodity', primaryCommodity],
+    occurrenceType && ['Occurrence type', occurrenceType],
+    status && ['Status', status],
+    otherCommodities && ['Other commodities', otherCommodities],
+    county && ['County', county],
+  ].filter(Boolean);
+
+  marker.bindPopup(`
+    <article class="map-popup">
+      <header class="map-popup-head">
+        <h3>${esc(name)}</h3>
+      </header>
+      <div class="map-popup-grid">
+        ${rows.map(([k, v]) => `
+          <span>${esc(k)}</span>
+          <strong>${esc(v)}</strong>
+        `).join('')}
+      </div>
+    </article>
+  `);
+},
     });
     fetch('/api/mineral-occurrences')
       .then(r => {
