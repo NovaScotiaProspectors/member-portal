@@ -72,14 +72,43 @@
     }
     return '';
   };
+function mineralCommodityColor(commodity) {
+  const value = String(commodity || '').trim().toLowerCase();
 
+  const colors = {
+    au: '#FFD700',        // Gold
+    ag: '#C0C0C0',        // Silver
+    cu: '#E67E22',        // Copper
+    pb: '#7F8C8D',        // Lead
+    zn: '#3498DB',        // Zinc
+    fe: '#C0392B',        // Iron
+    li: '#9B59B6',        // Lithium
+    sn: '#8E6E53',        // Tin
+    w: '#5D6D7E',         // Tungsten
+    sb: '#16A085',        // Antimony
+    mo: '#2980B9',        // Molybdenum
+    mn: '#8E44AD',        // Manganese
+    ni: '#27AE60',        // Nickel
+    co: '#2471A3',        // Cobalt
+    u: '#7FFF00',         // Uranium
+    gypsum: '#F5B7B1',
+    limestone: '#D7CCC8',
+    dolomite: '#D2B4DE',
+    barite: '#85C1E9',
+    graphite: '#566573',
+  };
+
+  return colors[value] || '#F5D547';
+}
   function mineralOccurrenceLayer() {
     const layer = L.geoJSON(null, {
       pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
         radius: 5,
         weight: 1.5,
         color: '#111',
-        fillColor: '#F5D547',
+        fillColor: mineralCommodityColor(
+         feature.properties?.comm_prim || feature.properties?.Commodity
+        ),
         fillOpacity: 0.85,
       }),
       onEachFeature: (feature, marker) => {
