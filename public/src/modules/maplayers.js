@@ -75,30 +75,53 @@
 function mineralCommodityColor(commodity) {
   const value = String(commodity || '').trim().toLowerCase();
 
-  const colors = {
-    au: '#FFD700',        // Gold
-    ag: '#C0C0C0',        // Silver
-    cu: '#E67E22',        // Copper
-    pb: '#7F8C8D',        // Lead
-    zn: '#3498DB',        // Zinc
-    fe: '#C0392B',        // Iron
-    li: '#9B59B6',        // Lithium
-    sn: '#8E6E53',        // Tin
-    w: '#5D6D7E',         // Tungsten
-    sb: '#16A085',        // Antimony
-    mo: '#2980B9',        // Molybdenum
-    mn: '#8E44AD',        // Manganese
-    ni: '#27AE60',        // Nickel
-    co: '#2471A3',        // Cobalt
-    u: '#7FFF00',         // Uranium
-    gypsum: '#F5B7B1',
-    limestone: '#D7CCC8',
-    dolomite: '#D2B4DE',
-    barite: '#85C1E9',
-    graphite: '#566573',
-  };
+  // Major exploration commodities
+  if (value === 'au') return '#FFD700'; // Gold
+  if (value === 'cu') return '#E67E22'; // Copper
+  if (value === 'fe') return '#C0392B'; // Iron
+  if (value === 'ag') return '#D7DCE2'; // Silver
 
-  return colors[value] || '#F5D547';
+  // Lead-Zinc
+  if (['pb', 'zn'].includes(value)) {
+    return '#3498DB';
+  }
+
+  // Critical and specialty metals
+  if ([
+    'li', 'sb', 'w', 'sn', 'co', 'ni', 'mo', 'mn',
+    'be', 'ree', 'u', 'as', 'ti', 'v', 'ta', 'th',
+    'bi', 'hg', 'cr', 'aluminium', 'mg'
+  ].includes(value)) {
+    return '#9B59B6';
+  }
+
+  // Industrial minerals
+  if ([
+    'gypsum', 'limestone', 'dolomite', 'barite', 'ba',
+    'diatomite', 'clay', 'silica', 'quartz', 'graphite',
+    'zeolite', 'salt', 'potash', 'potash salts', 'f',
+    'kaolinite', 'k-feldspar', 'muscovite', 'garnet',
+    'celestite', 'pyrophyllite'
+  ].includes(value)) {
+    return '#5DADE2';
+  }
+
+  // Construction and dimension stone
+  if ([
+    'aggregate', 'building stone', 'marble', 'slate'
+  ].includes(value)) {
+    return '#A1887F';
+  }
+
+  // Coal and carbonaceous / sedimentary materials
+  if ([
+    'coal', 'shale', 'siltstone', 'c'
+  ].includes(value)) {
+    return '#707B7C';
+  }
+
+  // Other or uncommon commodities
+  return '#F5D547';
 }
   function mineralOccurrenceLayer() {
     const layer = L.geoJSON(null, {
