@@ -7,22 +7,47 @@ function createMineralOccurrenceService() {
   async function loadMineralOccurrences() {
     if (cache) return cache;
 
-    const params = new URLSearchParams({
-      where: '1=1',
-      outFields: 'occ_num,name,occ_type,status,comm_prim,comm_list,county,lat_wm84dd,lon_wm84dd',
-      returnGeometry: 'true',
-      outSR: '4326',
-      f: 'geojson'
-    });
+    const allFeatures = [];
+let offset = 0;
+const pageSize = 2000;
 
-    const response = await fetch(`${MINERAL_OCCURRENCES_URL}?${params}`);
+while (true) {
+  const params = new URLSearchParams({
+    where: '1=1',
+    outFields: 'geo_id,occ_num,name,occ_type,status,comm_prim,comm_list,county,lat_wm84dd,lon_wm84dd',
+    returnGeometry: 'true',
+    outSR: '4326',
+    f: 'geojson',
+    resultOffset: String(offset),
+    resultRecordCount: String(pageSize),
+    orderByFields: 'geo_id'
+  });
 
-    if (!response.ok) {
-      throw new Error(`Nova Scotia Mineral Occurrence service returned ${response.status}.`);
-    }
+  const response = await fetch(`${MINERAL_OCCURRENCES_URL}?${params}`);
 
-    const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Nova Scotia Mineral Occurrence service returned ${response.status}.`);
+  }
 
+  const page = await response.json();
+
+  if (!page || page.type !== 'FeatureCollection' || !Array.isArray(page.features)) {
+    const err = new Error('Nova Scotia Mineral Occurrence service did not return valid GeoJSON.');
+    err.code = 'BAD_OCCURRENCES';
+    throw err;
+  }
+
+  allFeatures.push(...page.features);
+
+  if (page.features.length < pageSize) break;
+
+  offset += pageSize;
+}
+
+const data = {
+  type: 'FeatureCollection',
+  features: allFeatures
+};
     if (!data || data.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
       const err = new Error('Nova Scotia Mineral Occurrence service did not return valid GeoJSON.');
       err.code = 'BAD_OCCURRENCES';
