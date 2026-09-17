@@ -29,7 +29,7 @@
     const map = L.map('fieldMap', { zoomControl: false, preferCanvas: true })
       .setView([45.1, -63.0], 7);
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5', {
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       maxZoom: 19,
     }).addTo(map);
@@ -246,7 +246,7 @@
         for (let x = a.x; x <= b.x; x++) {
           for (let y = a.y; y <= b.y; y++) {
             for (const s of ['a', 'b', 'c']) {
-              urls.push(`https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`);
+              urls.push(`https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5`);
               break; // one subdomain is sufficient for cache matching
             }
           }
