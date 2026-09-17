@@ -198,7 +198,7 @@ class TenureEntry {
     if (!this.map) {
       this.map = L.map(this.mapEl).setView([45.1, -63.0], 7);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3o0z_1_f84cae6759c0a0ab5a6506e5', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         maxZoom: 19
       }).addTo(this.map);
