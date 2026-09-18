@@ -330,7 +330,8 @@ function mineralCommodityColor(commodity) {
   }),
 },
 {
-  id: 'staking', label: 'Staking allowed', group: 'Land status', minZoom: 9,
+  id: 'staking', label: 'Designated lands — staking allowed', group: 'Land status', minZoom: 9,
+  hint: 'Special land-use areas where mineral staking is permitted',
   make: () => arcgis(NOVAROC, {
     showIds: '43,44,45,46,47,48,49,50,51,52,53,54',
     opacity: 0.5
