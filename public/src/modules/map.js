@@ -13,6 +13,60 @@
     };
     const statusColor = s => STATUS_COLORS[s] || STATUS_COLORS.Pending;
 
+    function projectCommodityColor(commodities) {
+  const primary = Array.isArray(commodities)
+    ? String(commodities[0] || '').trim().toLowerCase()
+    : String(commodities || '').split(',')[0].trim().toLowerCase();
+
+  // Major exploration commodities
+  if (primary === 'au') return '#FFD700'; // Gold
+  if (primary === 'cu') return '#E67E22'; // Copper
+  if (primary === 'fe') return '#C0392B'; // Iron
+  if (primary === 'ag') return '#D7DCE2'; // Silver
+
+  // Lead-Zinc / base metals
+  if (['pb', 'zn'].includes(primary)) {
+    return '#3498DB';
+  }
+
+  // Critical and specialty metals
+  if ([
+    'li', 'sb', 'w', 'sn', 'co', 'ni', 'mo', 'mn',
+    'be', 'ree', 'u', 'as', 'ti', 'v', 'ta', 'th',
+    'bi', 'hg', 'cr', 'aluminium', 'mg'
+  ].includes(primary)) {
+    return '#9B59B6';
+  }
+
+  // Industrial minerals
+  if ([
+    'gypsum', 'limestone', 'dolomite', 'barite', 'ba',
+    'diatomite', 'clay', 'silica', 'quartz', 'graphite',
+    'zeolite', 'salt', 'potash', 'potash salts', 'f',
+    'kaolinite', 'k-feldspar', 'muscovite', 'garnet',
+    'celestite', 'pyrophyllite'
+  ].includes(primary)) {
+    return '#5DADE2';
+  }
+
+  // Construction and dimension stone
+  if ([
+    'aggregate', 'building stone', 'marble', 'slate'
+  ].includes(primary)) {
+    return '#A1887F';
+  }
+
+  // Coal and sedimentary materials
+  if ([
+    'coal', 'shale', 'siltstone', 'c'
+  ].includes(primary)) {
+    return '#707B7C';
+  }
+
+  // Other, mixed or unspecified
+  return '#F5D547';
+}
+
     // Below this zoom a claim block is only a few pixels across, so clustered
     // markers are the only way to find anything. At or above it the boundary
     // is the information, and the polygons take over.
@@ -306,7 +360,7 @@
       badge.hidden = n === 0;
 
       for (const p of visible) {
-        const color = statusColor(p.status);
+        const color = projectCommodityColor(p.commodities);
 
         // Real claim boundaries, used from POLYGON_ZOOM upwards.
         const group = L.featureGroup();
