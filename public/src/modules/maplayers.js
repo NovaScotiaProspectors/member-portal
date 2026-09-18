@@ -13,8 +13,10 @@
 (function () {
   const NOVAROC = 'https://novarocmaps.novascotia.ca/arcgis/rest/services/NovaRoc/MapServer';
   const BASEDATA = 'https://novarocmaps.novascotia.ca/arcgis/rest/services/Novaroc_basemaps/MapServer';
+  const CROWNLANDS = 'https://nsgiwa.novascotia.ca/arcgis/rest/services/PLAN/PLANCrownLandsWM84V1/MapServer';
   const GEOSCIENCE = 'https://fletcher.novascotia.ca/arcgis/rest/services/geoscience';
   const SURFICIAL = 'https://fletcher.novascotia.ca/arcgis/rest/services/surficial';
+  
 
   // Tiled ArcGIS `export` requests. Extending GridLayer means Leaflet handles
   // tile lifecycle, panning and zoom for us; we only build the URL.
@@ -308,19 +310,32 @@ function mineralCommodityColor(commodity) {
       id: 'claims', label: 'Claims & mining tracts', group: 'Mining', minZoom: 11,
       make: () => arcgis(NOVAROC, { showIds: '13,16,17', opacity: 0.7 }),
     },
-    {
-      id: 'crown', label: 'Crown land (staking allowed)', group: 'Land status', minZoom: 9,
-      make: () => arcgis(NOVAROC, { showIds: '21,42', opacity: 0.5 }),
-    },
-    {
-      id: 'protected', label: 'Protected areas', group: 'Land status', minZoom: 8,
-      hint: 'Parks, wilderness areas, nature reserves',
-      make: () => arcgis(NOVAROC, { showIds: '22,23,25,26,27,29,30,43,44,45,46,49', opacity: 0.55 }),
-    },
-    {
-      id: 'restricted', label: 'Restricted lands', group: 'Land status', minZoom: 9,
-      make: () => arcgis(NOVAROC, { showIds: '21,22,34', opacity: 0.5 }),
-    },
+ {
+  id: 'crown', label: 'Crown lands', group: 'Land status', minZoom: 9,
+  hint: 'Provincial Crown parcels',
+  make: () => arcgis(CROWNLANDS, { showIds: '0', opacity: 0.5 }),
+},
+{
+  id: 'restricted', label: 'Restricted lands (no staking)', group: 'Land status', minZoom: 8,
+  make: () => arcgis(NOVAROC, {
+    showIds: '23,24,25,26,27,28,29,30,31,32,33',
+    opacity: 0.55
+  }),
+},
+{
+  id: 'conditional', label: 'Conditional lands (conditional staking)', group: 'Land status', minZoom: 9,
+  make: () => arcgis(NOVAROC, {
+    showIds: '35,36,37,38,39,40,41',
+    opacity: 0.5
+  }),
+},
+{
+  id: 'staking', label: 'Staking allowed', group: 'Land status', minZoom: 9,
+  make: () => arcgis(NOVAROC, {
+    showIds: '43,44,45,46,47,48,49,50,51,52,53,54',
+    opacity: 0.5
+  }),
+},
     {
       id: 'basedata', label: 'Roads & water', group: 'Base data',
       hint: 'Roads, rivers, lakes, contours',
