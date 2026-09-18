@@ -1,7 +1,7 @@
 (async function () {
     const { esc, api, showToast, favoriteButton, toggleFavorite, debounce, getSession } = NSPA;
 
-    const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const cssVar = n => getComputedStyle(document.documentElement).map(n).trim();
     const STATUS_COLORS = {
       Approved: cssVar('--success') || '#6FBF73',
       Pending: cssVar('--gold') || '#C9A84C',
@@ -431,7 +431,7 @@
 
       listEl.innerHTML = visible.map(p => `
         <button type="button" class="map-result" data-id="${esc(p.id)}">
-          <span class="map-result-bar" style="background:${statusColor(p.status)}"></span>
+          <span class="map-result-bar" style="background:${projectCommodityColor(p.commodities)}"></span>
           <span class="map-result-body">
             <span class="map-result-title">${esc(p.title)}</span>
             <span class="map-result-meta">${esc([p.operator, p.county, p.projectStage].filter(Boolean).join(' · '))}</span>
