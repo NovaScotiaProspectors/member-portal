@@ -1,7 +1,7 @@
 (async function () {
     const { esc, api, showToast, favoriteButton, toggleFavorite, debounce, getSession } = NSPA;
 
-    const cssVar = n => getComputedStyle(document.documentElement).map(n).trim();
+    const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
     const STATUS_COLORS = {
       Approved: cssVar('--success') || '#6FBF73',
       Pending: cssVar('--gold') || '#C9A84C',
