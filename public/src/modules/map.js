@@ -104,13 +104,19 @@
       if (!id) return;
       const spec = overlays.find(o => o.id === id);
       if (!spec || !spec.make) return;
-      if (e.target.checked) {
-        if (!overlayInstances.has(id)) overlayInstances.set(id, spec.make());
-        overlayInstances.get(id).on && overlayInstances.get(id).on('data:error', ev => showToast(ev.error.message, 'error'));
-        overlayInstances.get(id).addTo(map);
-        if (spec.minZoom && map.getZoom() < spec.minZoom) showToast(`Zoom in to see "${spec.label}".`, 'success');
-      } else if (overlayInstances.has(id)) {
-        map.removeLayer(overlayInstances.get(id));
+        if (id === 'occurrences') {
+  const commodityLegend = document.getElementById('mineralCommodityLegend');
+  if (commodityLegend) {
+    commodityLegend.style.display = e.target.checked ? '' : 'none';
+  }
+}
+  if (e.target.checked) {
+     if (!overlayInstances.has(id)) overlayInstances.set(id, spec.make());
+     overlayInstances.get(id).on && overlayInstances.get(id).on('data:error', ev => showToast(ev.error.message, 'error'));
+    overlayInstances.get(id).addTo(map);
+    if (spec.minZoom && map.getZoom() < spec.minZoom) showToast(`Zoom in to see "${spec.label}".`, 'success');
+  } else if (overlayInstances.has(id)) {
+     map.removeLayer(overlayInstances.get(id));
       }
       restack();
     });
