@@ -2410,7 +2410,18 @@ const CLAIM_ALERT_COPY = {
       : `Tenure ${tenureNumber}, next to ground you hold, is now "${record.status}" and may become available for staking.`,
   }),
 };
+const OPEN_GROUND_ALERT_MILESTONES = [60, 30, 14, 2];
 
+function claimAlertMilestone(payload) {
+  if (payload.kind !== 'open_ground') return null;
+
+  const days = Number(payload.days);
+  if (!Number.isFinite(days) || days < 0) return null;
+
+return [...OPEN_GROUND_ALERT_MILESTONES]
+  .reverse()
+  .find(milestone => days <= milestone) || null;
+}
 function cleanClaimAlertCriteria(input = {}) {
   const src = input && typeof input === 'object' ? input : {};
   const statuses = Array.isArray(src.statuses) ? src.statuses : [];
@@ -2631,28 +2642,51 @@ async function deliverOpportunityAlert(payload) {
   }
 }
 
-function deliverClaimAlert(payload) {
+async function deliverClaimAlert(payload) {
   const build = CLAIM_ALERT_COPY[payload.kind];
   if (!build) return;
+
+  // Nearby open-ground alerts are sent only at useful milestones:
+  // 60, 30, 14 and 2 days before expiry.
+  let milestone = null;
+  if (payload.kind === 'open_ground') {
+    milestone = claimAlertMilestone(payload);
+    if (milestone == null) return;
+  }
+
   const copy = build(payload);
 
-  safely('claim alert', () => portal.addNotification({
+  // Each milestone/event gets a stable key so the twice-daily claim watcher
+  // cannot create the same notification repeatedly.
+  const dedupeKey = payload.kind === 'open_ground'
+    ? `claim:${payload.kind}:${payload.tenureNumber}:${milestone}`
+    : `claim:${payload.kind}:${payload.tenureNumber}:${payload.dueDate || payload.record?.status || 'current'}`;
+
+  let notification;
+  try {
+    notification = await portal.addNotification({
       memberId: payload.holder.memberId,
       type: copy.type,
       title: copy.title,
       body: copy.body,
       link: '/claims.html',
-    }));
+      dedupeKey,
+    });
+  } catch (error) {
+    console.warn('claim alert:', error.message);
+    return;
+  }
 
-  // Email is best-effort and only when outbound mail is configured; the in-app
-  // notification above is always the reliable channel.
+  // A null result means this dedupe key already exists, so this milestone
+  // has already been delivered. Do not send another email either.
+  if (!notification) return;
+
   sendMailIfConfigured({
     to: payload.holder.email,
     subject: copy.title,
     text: `${copy.body}\n\nView your claims: ${APP_BASE_URL}/claims.html\n`,
   });
 }
-
 let claimWatchRunning = false;
 let lastClaimWatch = null;
 
