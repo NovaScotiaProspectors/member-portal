@@ -9,6 +9,7 @@ const { registerTenureRoutes } = require('./routes/tenure');
 const { normalizeTenure, fetchTenureGeoJSON } = require('./services/novaRoc');
 const { createMineralOccurrenceService } = require('./services/mineralOccurrences');
 const { registerMineralOccurrenceRoutes } = require('./routes/mineralOccurrences');
+const { createExplorationLicenceService } = require('./services/explorationLicences');
 const { createMetalPriceService } = require('./services/metalPrices');
 const { registerPriceRoutes } = require('./routes/prices');
 const { createBackupService } = require('./services/backups');
@@ -54,6 +55,7 @@ const REFERENCE_DIR = path.join(ROOT_DIR, 'data', 'reference');
 const DATA_DRIVER = supabase.dataDriver();
 const USE_SUPABASE = DATA_DRIVER === 'supabase';
 const mineralOccurrences = createMineralOccurrenceService({ geojsonPath: path.join(REFERENCE_DIR, 'mineral-occurrences.geojson') });
+const explorationLicences = createExplorationLicenceService();
 
 const tempPathFor = target => `${target}.${process.pid}.tmp`;
 
