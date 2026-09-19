@@ -196,7 +196,81 @@ function mineralCommodityColor(commodity) {
       });
     return layer;
   }
+function otherExplorationLicencesLayer() {
+  const layer = L.geoJSON(null, {
+    style: {
+      color: '#8a8a8a',
+      weight: 1,
+      opacity: 0.8,
+      fillOpacity: 0,
+    },
 
+    onEachFeature: (feature, polygon) => {
+      const p = feature.properties || {};
+
+      const tenureNumber = p.TENURE_NUMBER_ID || '';
+      const status = p.MINERAL_TENURE_STATUS_CODE || '';
+      const area = p.AREA_IN_HECTARES;
+
+      const rows = [
+        tenureNumber && ['Tenure', tenureNumber],
+        status && ['Status', status],
+        area != null && ['Area', `${Number(area).toLocaleString()} ha`],
+      ].filter(Boolean);
+
+      polygon.bindPopup(`
+        <article class="map-popup">
+          <header class="map-popup-head">
+            <h3>Exploration Licence ${esc(tenureNumber)}</h3>
+          </header>
+          <div class="map-popup-grid" style="display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; align-items:start;">
+            ${rows.map(([k, v]) => `
+              <span style="opacity:0.7;">${esc(k)}</span>
+              <strong>${esc(v)}</strong>
+            `).join('')}
+          </div>
+        </article>
+      `);
+    },
+  });
+
+  Promise.all([
+    fetch('/api/exploration-licences').then(response => {
+      if (!response.ok) throw new Error('Exploration licences could not be loaded.');
+      return response.json();
+    }),
+    fetch('/api/projects/map').then(response => {
+      if (!response.ok) throw new Error('Member projects could not be loaded.');
+      return response.json();
+    }),
+  ])
+    .then(([licences, projectData]) => {
+      const memberTenures = new Set(
+        (projectData.projects || [])
+          .flatMap(project => project.tenureNumbers || [])
+          .map(number => String(number).trim().toUpperCase())
+          .filter(Boolean)
+      );
+
+      const filtered = {
+        type: 'FeatureCollection',
+        features: (licences.features || []).filter(feature => {
+          const tenureNumber = String(
+            feature.properties?.TENURE_NUMBER_ID || ''
+          ).trim().toUpperCase();
+
+          return tenureNumber && !memberTenures.has(tenureNumber);
+        }),
+      };
+
+      layer.addData(filtered);
+    })
+    .catch(error => {
+      layer.fire('data:error', { error });
+    });
+
+  return layer;
+}  
   /* ── Base maps (mutually exclusive) ── */
   const baseLayers = [
     {
@@ -306,6 +380,14 @@ function mineralCommodityColor(commodity) {
       hint: 'MEB occurrence dataset',
       make: mineralOccurrenceLayer,
     },
+    {
+    id: 'other-exploration-licences',
+    label: 'Other exploration licences',
+    group: 'Mining',
+    minZoom: 8,
+    hint: 'Other exploration licences',
+    make: otherExplorationLicencesLayer,
+},
     {
       id: 'claims', label: 'Claims & mining tracts', group: 'Mining', minZoom: 11,
       make: () => arcgis(NOVAROC, { showIds: '13,16,17', opacity: 0.7 }),
