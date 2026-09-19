@@ -10,6 +10,7 @@ const { normalizeTenure, fetchTenureGeoJSON } = require('./services/novaRoc');
 const { createMineralOccurrenceService } = require('./services/mineralOccurrences');
 const { registerMineralOccurrenceRoutes } = require('./routes/mineralOccurrences');
 const { createExplorationLicenceService } = require('./services/explorationLicences');
+const { registerExplorationLicenceRoutes } = require('./routes/explorationLicences');
 const { createMetalPriceService } = require('./services/metalPrices');
 const { registerPriceRoutes } = require('./routes/prices');
 const { createBackupService } = require('./services/backups');
@@ -1209,6 +1210,7 @@ const getDepositTypes = withCache(loadDepositTypes, SHEET_TTL_MS);
 
 registerOptionRoutes(app, { getCommodities, getDepositTypes });
 registerMineralOccurrenceRoutes(app, { mineralOccurrences });
+registerExplorationLicenceRoutes(app, { explorationLicences });
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Sign-up — user records stored in Supabase or appended to data/users.xlsx.
